@@ -12,6 +12,7 @@ export type Database = {
       auctions: {
         Row: {
           created_at: string | null
+          creator_id: string | null
           current_price: number
           description: string
           ends_at: string
@@ -26,6 +27,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          creator_id?: string | null
           current_price: number
           description: string
           ends_at: string
@@ -40,6 +42,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          creator_id?: string | null
           current_price?: number
           description?: string
           ends_at?: string

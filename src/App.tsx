@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AuctionDetail from "./pages/AuctionDetail";
+import AuctionManagement from "./pages/AuctionManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AuctionDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/my-auctions" 
+              element={
+                <ProtectedRoute>
+                  <AuctionManagement />
                 </ProtectedRoute>
               } 
             />
