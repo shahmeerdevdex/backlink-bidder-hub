@@ -184,6 +184,8 @@ export type Database = {
           id: string
           status: string | null
           stripe_payment_id: string | null
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -194,6 +196,8 @@ export type Database = {
           id?: string
           status?: string | null
           stripe_payment_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -204,6 +208,8 @@ export type Database = {
           id?: string
           status?: string | null
           stripe_payment_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }

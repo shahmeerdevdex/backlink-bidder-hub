@@ -25,6 +25,7 @@ export default function PaymentPage() {
   const [bid, setBid] = useState<Bid | null>(null);
   const [auction, setAuction] = useState<Auction | null>(null);
   const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -69,32 +70,26 @@ export default function PaymentPage() {
 
   const handlePayment = async () => {
     if (!bid) return;
+    
+    setProcessingPayment(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { bidId: bid.id }
+      });
 
-    // Here we'll integrate with Stripe Checkout
-    // For now, we'll just create a payment record
-    const { error: paymentError } = await supabase
-      .from('payments')
-      .insert([
-        {
-          bid_id: bid.id,
-          amount: bid.amount,
-          status: 'pending'
-        }
-      ]);
+      if (error) throw error;
+      if (!data.sessionUrl) throw new Error('No checkout URL received');
 
-    if (paymentError) {
+      // Redirect to Stripe Checkout
+      window.location.href = data.sessionUrl;
+    } catch (error: any) {
       toast({
-        title: "Error creating payment",
-        description: paymentError.message,
+        title: "Error initiating payment",
+        description: error.message,
         variant: "destructive",
       });
-      return;
+      setProcessingPayment(false);
     }
-
-    toast({
-      title: "Payment initiated",
-      description: "You will be redirected to complete the payment",
-    });
   };
 
   if (loading) {
@@ -138,9 +133,16 @@ export default function PaymentPage() {
           <Button 
             className="w-full" 
             onClick={handlePayment}
-            disabled={bid.status !== 'active'}
+            disabled={bid.status !== 'active' || processingPayment}
           >
-            Pay ${bid.amount}
+            {processingPayment ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Redirecting to payment...
+              </>
+            ) : (
+              `Pay $${bid.amount}`
+            )}
           </Button>
         </CardFooter>
       </Card>
