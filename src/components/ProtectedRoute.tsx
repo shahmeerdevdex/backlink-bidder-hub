@@ -2,8 +2,13 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  adminOnly?: boolean;
+}
+
+export function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
+  const { user, loading, isAdmin } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -13,6 +18,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!user) {
     // Save the attempted URL to redirect back after login
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

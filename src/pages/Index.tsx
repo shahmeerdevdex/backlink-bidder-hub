@@ -28,7 +28,7 @@ export default function Index() {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [sortBy, setSortBy] = useState<string>('ends_at');
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   useEffect(() => {
     const fetchAuctions = async () => {
@@ -67,9 +67,19 @@ export default function Index() {
         <h1 className="text-3xl font-bold">Active Auctions</h1>
         <div className="flex gap-4 items-center">
           {user && (
-            <Button onClick={() => navigate('/my-auctions')}>
-              Manage My Auctions
-            </Button>
+            <>
+              <Button onClick={() => navigate('/my-auctions')}>
+                Manage My Auctions
+              </Button>
+              {isAdmin && (
+                <Button 
+                  variant="secondary"
+                  onClick={() => navigate('/admin')}
+                >
+                  Admin Dashboard
+                </Button>
+              )}
+            </>
           )}
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-[180px]">
