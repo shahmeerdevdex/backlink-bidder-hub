@@ -74,7 +74,7 @@ export function AuctionCard({
 
   const getSpotsBadgeVariant = () => {
     if (isFullyBooked) return "destructive";
-    if (filledSpots >= maxSpots * 0.8) return "warning";
+    if (filledSpots >= maxSpots * 0.8) return "default"; // Changed from "warning" to "default"
     return "secondary";
   };
 
