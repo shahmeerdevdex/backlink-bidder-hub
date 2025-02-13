@@ -12,6 +12,7 @@ import AuctionDetail from "./pages/AuctionDetail";
 import AuctionManagement from "./pages/AuctionManagement";
 import AdminDashboard from "./pages/AdminDashboard";
 import PaymentPage from "./pages/PaymentPage";
+import UserDashboard from "./pages/UserDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,14 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Index />} />
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <UserDashboard />
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/auctions/:id" 
               element={
