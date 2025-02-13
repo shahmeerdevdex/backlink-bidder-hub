@@ -24,6 +24,12 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Award, Clock, CreditCard } from 'lucide-react';
 
+interface Payment {
+  id: string;
+  status: string;
+  amount: number;
+}
+
 interface Bid {
   id: string;
   amount: number;
@@ -35,11 +41,7 @@ interface Bid {
     ends_at: string;
     current_price: number;
   };
-  payment?: {
-    id: string;
-    status: string;
-    amount: number;
-  };
+  payments: Payment[]; // Changed from payment? to payments
 }
 
 interface WonAuction {
@@ -52,10 +54,7 @@ interface WonAuction {
   winning_bid: {
     id: string;
     amount: number;
-    payment?: {
-      id: string;
-      status: string;
-    };
+    payments: Payment[]; // Changed from payment? to payments
   };
 }
 
@@ -89,7 +88,7 @@ export default function UserDashboard() {
             ends_at,
             current_price
           ),
-          payment:payments (
+          payments:payments (
             id,
             status,
             amount
@@ -114,7 +113,7 @@ export default function UserDashboard() {
           winning_bid:bids (
             id,
             amount,
-            payment:payments (
+            payments:payments (
               id,
               status
             )
@@ -136,9 +135,13 @@ export default function UserDashboard() {
     }
   };
 
-  const getPaymentStatusBadge = (status: string | undefined) => {
-    if (!status) return <Badge variant="secondary">No Payment</Badge>;
-    switch (status) {
+  const getPaymentStatusBadge = (payments: Payment[] | undefined) => {
+    if (!payments || payments.length === 0) return <Badge variant="secondary">No Payment</Badge>;
+    
+    // Get the latest payment
+    const latestPayment = payments[0];
+    
+    switch (latestPayment.status) {
       case 'completed':
         return <Badge variant="default">Paid</Badge>;
       case 'pending':
@@ -146,7 +149,7 @@ export default function UserDashboard() {
       case 'failed':
         return <Badge variant="destructive">Failed</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline">{latestPayment.status}</Badge>;
     }
   };
 
@@ -205,7 +208,7 @@ export default function UserDashboard() {
                         {format(new Date(bid.auction.ends_at), 'PPp')}
                       </TableCell>
                       <TableCell>
-                        {getPaymentStatusBadge(bid.payment?.status)}
+                        {getPaymentStatusBadge(bid.payments)}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -256,7 +259,7 @@ export default function UserDashboard() {
                         {format(new Date(won.auction.ends_at), 'PPp')}
                       </TableCell>
                       <TableCell>
-                        {getPaymentStatusBadge(won.winning_bid.payment?.status)}
+                        {getPaymentStatusBadge(won.winning_bid.payments)}
                       </TableCell>
                       <TableCell>
                         <div className="space-x-2">
@@ -267,7 +270,8 @@ export default function UserDashboard() {
                           >
                             View Auction
                           </Button>
-                          {(!won.winning_bid.payment || won.winning_bid.payment.status === 'failed') && (
+                          {(!won.winning_bid.payments || won.winning_bid.payments.length === 0 || 
+                            won.winning_bid.payments[0].status === 'failed') && (
                             <Button
                               size="sm"
                               onClick={() => handlePayment(won.winning_bid.id)}
@@ -308,19 +312,21 @@ export default function UserDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activeBids.filter(bid => bid.payment).map((bid) => (
-                    <TableRow key={bid.payment?.id}>
-                      <TableCell>{bid.auction.title}</TableCell>
-                      <TableCell>${bid.payment?.amount}</TableCell>
-                      <TableCell>
-                        {format(new Date(bid.created_at), 'PPp')}
-                      </TableCell>
-                      <TableCell>
-                        {getPaymentStatusBadge(bid.payment?.status)}
-                      </TableCell>
-                    </TableRow>
+                  {activeBids.filter(bid => bid.payments && bid.payments.length > 0).map((bid) => (
+                    bid.payments.map(payment => (
+                      <TableRow key={payment.id}>
+                        <TableCell>{bid.auction.title}</TableCell>
+                        <TableCell>${payment.amount}</TableCell>
+                        <TableCell>
+                          {format(new Date(bid.created_at), 'PPp')}
+                        </TableCell>
+                        <TableCell>
+                          {getPaymentStatusBadge([payment])}
+                        </TableCell>
+                      </TableRow>
+                    ))
                   ))}
-                  {activeBids.filter(bid => bid.payment).length === 0 && (
+                  {activeBids.filter(bid => bid.payments && bid.payments.length > 0).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center">
                         No payment history available.
