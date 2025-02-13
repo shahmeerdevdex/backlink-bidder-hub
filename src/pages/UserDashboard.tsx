@@ -100,7 +100,7 @@ export default function UserDashboard() {
       if (bidsError) throw bidsError;
       setActiveBids(bidsData || []);
 
-      // Fetch won auctions
+      // Fetch won auctions - Updated to include amount in payments selection
       const { data: wonData, error: wonError } = await supabase
         .from('auction_winners')
         .select(`
@@ -115,7 +115,8 @@ export default function UserDashboard() {
             amount,
             payments:payments (
               id,
-              status
+              status,
+              amount
             )
           )
         `)
