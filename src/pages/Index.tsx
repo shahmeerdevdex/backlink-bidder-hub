@@ -42,7 +42,13 @@ export default function Index() {
         return;
       }
 
-      setAuctions(data || []);
+      // Filter out auctions that have ended
+      const currentDate = new Date();
+      const activeAuctions = data?.filter(auction => 
+        new Date(auction.ends_at) > currentDate
+      ) || [];
+
+      setAuctions(activeAuctions);
     };
 
     fetchAuctions();

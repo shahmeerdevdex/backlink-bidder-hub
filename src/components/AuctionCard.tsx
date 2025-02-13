@@ -31,6 +31,8 @@ export function AuctionCard({
 }: AuctionCardProps) {
   const [timeLeft, setTimeLeft] = useState<string>('');
   const { toast } = useToast();
+  const isFullyBooked = filledSpots >= maxSpots;
+  const isExpired = new Date(endsAt) <= new Date();
 
   useEffect(() => {
     const updateTimeLeft = () => {
@@ -49,7 +51,7 @@ export function AuctionCard({
   }, [endsAt]);
 
   const handleBidClick = () => {
-    if (filledSpots >= maxSpots) {
+    if (isFullyBooked) {
       toast({
         title: "No spots available",
         description: "This auction has reached its maximum number of spots.",
@@ -57,7 +59,23 @@ export function AuctionCard({
       });
       return;
     }
+
+    if (isExpired) {
+      toast({
+        title: "Auction ended",
+        description: "This auction has already ended.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     onBidClick();
+  };
+
+  const getSpotsBadgeVariant = () => {
+    if (isFullyBooked) return "destructive";
+    if (filledSpots >= maxSpots * 0.8) return "warning";
+    return "secondary";
   };
 
   return (
@@ -65,7 +83,7 @@ export function AuctionCard({
       <CardHeader>
         <CardTitle className="flex justify-between items-start">
           <span className="text-xl font-bold">{title}</span>
-          <Badge variant={filledSpots >= maxSpots ? "destructive" : "secondary"}>
+          <Badge variant={getSpotsBadgeVariant()}>
             <Users className="w-4 h-4 mr-1" />
             {filledSpots}/{maxSpots} spots
           </Badge>
@@ -92,9 +110,9 @@ export function AuctionCard({
         <Button 
           className="w-full" 
           onClick={handleBidClick}
-          disabled={filledSpots >= maxSpots}
+          disabled={isFullyBooked || isExpired}
         >
-          Place Bid
+          {isFullyBooked ? 'Fully Booked' : isExpired ? 'Auction Ended' : 'Place Bid'}
         </Button>
       </CardFooter>
     </Card>
