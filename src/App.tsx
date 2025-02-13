@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import AuctionDetail from "./pages/AuctionDetail";
 import AuctionManagement from "./pages/AuctionManagement";
 import AdminDashboard from "./pages/AdminDashboard";
+import PaymentPage from "./pages/PaymentPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,14 @@ const App = () => (
               element={
                 <ProtectedRoute adminOnly>
                   <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/payment/:bidId" 
+              element={
+                <ProtectedRoute>
+                  <PaymentPage />
                 </ProtectedRoute>
               } 
             />

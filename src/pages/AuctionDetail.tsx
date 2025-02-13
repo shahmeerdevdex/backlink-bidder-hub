@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ interface Bid {
 
 export default function AuctionDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [auction, setAuction] = useState<Auction | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
   const [bidAmount, setBidAmount] = useState<string>('');
@@ -120,7 +121,7 @@ export default function AuctionDetail() {
       return;
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('bids')
       .insert([
         {
@@ -128,7 +129,9 @@ export default function AuctionDetail() {
           amount: amount,
           status: 'active'
         }
-      ]);
+      ])
+      .select()
+      .single();
 
     if (error) {
       toast({
@@ -142,8 +145,11 @@ export default function AuctionDetail() {
     setBidAmount('');
     toast({
       title: "Bid placed successfully",
-      description: "Your bid has been recorded",
+      description: "Proceed to payment to secure your bid",
     });
+
+    // Redirect to payment page
+    navigate(`/payment/${data.id}`);
   };
 
   if (!auction) {
