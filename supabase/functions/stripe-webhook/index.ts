@@ -5,12 +5,22 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? ''
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
   try {
     const signature = req.headers.get('stripe-signature')
     if (!signature) {
@@ -28,7 +38,10 @@ serve(async (req) => {
       )
     } catch (err) {
       console.error(`⚠️ Webhook signature verification failed.`, err.message)
-      return new Response(JSON.stringify({ error: err.message }), { status: 400 })
+      return new Response(JSON.stringify({ error: err.message }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      })
     }
 
     // Handle the event
@@ -86,12 +99,18 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ received: true }), { status: 200 })
+    return new Response(JSON.stringify({ received: true }), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200 
+    })
   } catch (error) {
     console.error('Error processing webhook:', error)
     return new Response(
       JSON.stringify({ error: 'Failed to process webhook' }),
-      { status: 400 }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400 
+      }
     )
   }
 })
