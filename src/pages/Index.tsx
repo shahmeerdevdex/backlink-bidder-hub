@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AuctionCard } from '@/components/AuctionCard';
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -11,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth } from '@/components/AuthProvider';
 
 interface Auction {
   id: string;
@@ -28,7 +26,6 @@ export default function Index() {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [sortBy, setSortBy] = useState<string>('ends_at');
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
 
   useEffect(() => {
     const fetchAuctions = async () => {
@@ -71,33 +68,16 @@ export default function Index() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Active Auctions</h1>
-        <div className="flex gap-4 items-center">
-          {user && (
-            <>
-              <Button onClick={() => navigate('/my-auctions')}>
-                Manage My Auctions
-              </Button>
-              {isAdmin && (
-                <Button 
-                  variant="secondary"
-                  onClick={() => navigate('/admin')}
-                >
-                  Admin Dashboard
-                </Button>
-              )}
-            </>
-          )}
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Sort by..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ends_at">Time Left</SelectItem>
-              <SelectItem value="current_price">Highest Bid</SelectItem>
-              <SelectItem value="filled_spots">Popularity</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Sort by..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ends_at">Time Left</SelectItem>
+            <SelectItem value="current_price">Highest Bid</SelectItem>
+            <SelectItem value="filled_spots">Popularity</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
