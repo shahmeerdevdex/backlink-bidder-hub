@@ -12,6 +12,8 @@ import AuctionDetail from "./pages/AuctionDetail";
 import AuctionManagement from "./pages/AuctionManagement";
 import AdminDashboard from "./pages/AdminDashboard";
 import PaymentPage from "./pages/PaymentPage";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancel from "./pages/PaymentCancel";
 import UserDashboard from "./pages/UserDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -64,6 +66,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <PaymentPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/payment/success" 
+              element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/payment/cancel" 
+              element={
+                <ProtectedRoute>
+                  <PaymentCancel />
                 </ProtectedRoute>
               } 
             />
