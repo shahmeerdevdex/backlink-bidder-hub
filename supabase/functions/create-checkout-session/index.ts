@@ -17,6 +17,8 @@ serve(async (req) => {
   try {
     const { bidId } = await req.json()
 
+    console.log('Processing bid:', bidId) // Add logging
+
     // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -38,9 +40,24 @@ serve(async (req) => {
       .eq('id', bidId)
       .single()
 
-    if (bidError || !bid) {
+    if (bidError) {
+      console.error('Bid fetch error:', bidError) // Add logging
       throw new Error('Bid not found')
     }
+
+    if (!bid) {
+      console.error('No bid found for ID:', bidId) // Add logging
+      throw new Error('Bid not found')
+    }
+
+    // Get user email
+    const { data: userEmail } = await supabaseClient
+      .from('profiles')
+      .select('email')
+      .eq('id', bid.user_id)
+      .single()
+
+    console.log('Creating Stripe session for bid:', bid) // Add logging
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -51,9 +68,9 @@ serve(async (req) => {
             currency: 'usd',
             product_data: {
               name: bid.auction.title,
-              description: bid.auction.description,
+              description: bid.auction.description || undefined,
             },
-            unit_amount: bid.amount * 100, // Convert to cents
+            unit_amount: Math.round(bid.amount * 100), // Convert to cents and ensure integer
           },
           quantity: 1,
         },
@@ -62,8 +79,10 @@ serve(async (req) => {
       success_url: `${req.headers.get('origin')}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get('origin')}/payment/cancel`,
       client_reference_id: bidId,
-      customer_email: bid.user_id, // This will be replaced with actual user email in future
+      customer_email: userEmail?.email || bid.user_id,
     })
+
+    console.log('Stripe session created:', session.id) // Add logging
 
     // Create payment record
     const { error: paymentError } = await supabaseClient
@@ -79,6 +98,7 @@ serve(async (req) => {
       ])
 
     if (paymentError) {
+      console.error('Payment record creation error:', paymentError) // Add logging
       throw new Error('Failed to create payment record')
     }
 
@@ -90,6 +110,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    console.error('Error in create-checkout-session:', error) // Add logging
     return new Response(
       JSON.stringify({ error: error.message }),
       {
