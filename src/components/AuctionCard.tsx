@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Clock, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuctionCardProps {
   id: string;
@@ -20,19 +21,43 @@ interface AuctionCardProps {
 }
 
 export function AuctionCard({
+  id,
   title,
   description,
   startingPrice,
-  currentPrice,
+  currentPrice: initialCurrentPrice,
   maxSpots,
-  filledSpots,
+  filledSpots: initialFilledSpots,
   endsAt,
   onBidClick,
 }: AuctionCardProps) {
   const [timeLeft, setTimeLeft] = useState<string>('');
+  const [currentPrice, setCurrentPrice] = useState(initialCurrentPrice);
+  const [filledSpots, setFilledSpots] = useState(initialFilledSpots);
   const { toast } = useToast();
   const isFullyBooked = filledSpots >= maxSpots;
   const isExpired = new Date(endsAt) <= new Date();
+
+  useEffect(() => {
+    // Subscribe to auction updates
+    const channel = supabase
+      .channel(`auction-card-${id}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'auctions', filter: `id=eq.${id}` },
+        (payload) => {
+          console.log('Auction card update received:', payload);
+          if (payload.new) {
+            setCurrentPrice(payload.new.current_price);
+            setFilledSpots(payload.new.filled_spots);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
 
   useEffect(() => {
     const updateTimeLeft = () => {
@@ -74,7 +99,7 @@ export function AuctionCard({
 
   const getSpotsBadgeVariant = () => {
     if (isFullyBooked) return "destructive";
-    if (filledSpots >= maxSpots * 0.8) return "default"; // Changed from "warning" to "default"
+    if (filledSpots >= maxSpots * 0.8) return "default";
     return "secondary";
   };
 

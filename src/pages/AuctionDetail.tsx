@@ -82,21 +82,43 @@ export default function AuctionDetail() {
     fetchAuction();
     fetchBids();
 
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('realtime-updates')
+    // Subscribe to realtime updates for both auctions and bids
+    const auctionChannel = supabase
+      .channel('auction-updates')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'auctions', filter: `id=eq.${id}` },
-        fetchAuction
+        (payload) => {
+          console.log('Auction update received:', payload);
+          if (payload.new) {
+            setAuction(payload.new as Auction);
+          }
+        }
       )
+      .subscribe();
+
+    const bidsChannel = supabase
+      .channel('bids-updates')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'bids', filter: `auction_id=eq.${id}` },
-        fetchBids
+        async (payload) => {
+          console.log('Bid update received:', payload);
+          // Fetch all bids again to ensure correct ordering
+          const { data } = await supabase
+            .from('bids')
+            .select('*')
+            .eq('auction_id', id)
+            .order('amount', { ascending: false });
+          
+          if (data) {
+            setBids(data);
+          }
+        }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(auctionChannel);
+      supabase.removeChannel(bidsChannel);
     };
   }, [id]);
 
