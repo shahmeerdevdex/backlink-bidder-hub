@@ -17,7 +17,7 @@ serve(async (req) => {
   try {
     const { bidId } = await req.json()
 
-    console.log('Processing bid:', bidId) // Add logging
+    console.log('Processing bid:', bidId)
 
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -25,7 +25,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get bid details
+    // Get bid details with user email
     const { data: bid, error: bidError } = await supabaseClient
       .from('bids')
       .select(`
@@ -35,29 +35,30 @@ serve(async (req) => {
         auction:auctions (
           title,
           description
+        ),
+        user:profiles!bids_user_id_fkey (
+          email
         )
       `)
       .eq('id', bidId)
       .single()
 
     if (bidError) {
-      console.error('Bid fetch error:', bidError) // Add logging
+      console.error('Bid fetch error:', bidError)
       throw new Error('Bid not found')
     }
 
     if (!bid) {
-      console.error('No bid found for ID:', bidId) // Add logging
+      console.error('No bid found for ID:', bidId)
       throw new Error('Bid not found')
     }
 
-    // Get user email
-    const { data: userEmail } = await supabaseClient
-      .from('profiles')
-      .select('email')
-      .eq('id', bid.user_id)
-      .single()
+    if (!bid.user?.email) {
+      console.error('No email found for user:', bid.user_id)
+      throw new Error('User email not found')
+    }
 
-    console.log('Creating Stripe session for bid:', bid) // Add logging
+    console.log('Creating Stripe session for bid:', bid)
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -79,10 +80,10 @@ serve(async (req) => {
       success_url: `${req.headers.get('origin')}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get('origin')}/payment/cancel`,
       client_reference_id: bidId,
-      customer_email: userEmail?.email || bid.user_id,
+      customer_email: bid.user.email, // Use the email from the profiles table
     })
 
-    console.log('Stripe session created:', session.id) // Add logging
+    console.log('Stripe session created:', session.id)
 
     // Create payment record
     const { error: paymentError } = await supabaseClient
@@ -98,7 +99,7 @@ serve(async (req) => {
       ])
 
     if (paymentError) {
-      console.error('Payment record creation error:', paymentError) // Add logging
+      console.error('Payment record creation error:', paymentError)
       throw new Error('Failed to create payment record')
     }
 
@@ -110,7 +111,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error('Error in create-checkout-session:', error) // Add logging
+    console.error('Error in create-checkout-session:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       {
