@@ -162,7 +162,7 @@ export default function UserDashboard() {
       case 'pending_payment':
         return (
           <div className="flex flex-col">
-            <Badge variant="warning">Payment Required</Badge>
+            <Badge variant="secondary">Payment Required</Badge>
             <span className="text-xs text-muted-foreground mt-1">
               Due {format(deadline, 'PPp')}
             </span>
@@ -171,9 +171,9 @@ export default function UserDashboard() {
       case 'payment_missed':
         return <Badge variant="destructive">Payment Missed</Badge>;
       case 'paid':
-        return <Badge variant="success">Paid</Badge>;
+        return <Badge variant="default">Paid</Badge>;
       default:
-        return <Badge variant="secondary">{auction.status}</Badge>;
+        return <Badge variant="outline">{auction.status}</Badge>;
     }
   };
 
