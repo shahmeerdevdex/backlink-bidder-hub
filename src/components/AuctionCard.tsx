@@ -49,11 +49,12 @@ export function AuctionCard({
       .on<Auction>(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'auctions', filter: `id=eq.${id}` },
-        (payload: RealtimePostgresChangesPayload<Auction>) => {
+        (payload) => {
           console.log('Auction card update received:', payload);
-          if (payload.new) {
-            setCurrentPrice(payload.new.current_price);
-            setFilledSpots(payload.new.filled_spots || 0);
+          const newAuction = payload.new as Auction;
+          if (newAuction && typeof newAuction.current_price === 'number') {
+            setCurrentPrice(newAuction.current_price);
+            setFilledSpots(newAuction.filled_spots ?? 0);
           }
         }
       )
