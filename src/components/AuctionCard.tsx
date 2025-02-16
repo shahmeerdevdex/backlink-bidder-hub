@@ -7,6 +7,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { Clock, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
+
+type Auction = Database['public']['Tables']['auctions']['Row'];
 
 interface AuctionCardProps {
   id: string;
@@ -42,13 +46,14 @@ export function AuctionCard({
     // Subscribe to auction updates
     const channel = supabase
       .channel(`auction-card-${id}`)
-      .on('postgres_changes',
+      .on<Auction>(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'auctions', filter: `id=eq.${id}` },
-        (payload) => {
+        (payload: RealtimePostgresChangesPayload<Auction>) => {
           console.log('Auction card update received:', payload);
           if (payload.new) {
             setCurrentPrice(payload.new.current_price);
-            setFilledSpots(payload.new.filled_spots);
+            setFilledSpots(payload.new.filled_spots || 0);
           }
         }
       )
