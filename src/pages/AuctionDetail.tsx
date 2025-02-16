@@ -121,35 +121,54 @@ export default function AuctionDetail() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('bids')
-      .insert([
-        {
-          auction_id: auction.id,
-          amount: amount,
-          status: 'active'
-        }
-      ])
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('bids')
+        .insert([
+          {
+            auction_id: auction.id,
+            amount: amount,
+            status: 'active'
+          }
+        ])
+        .select()
+        .single();
 
-    if (error) {
+      if (error) {
+        // Check for max spots error
+        if (error.message.includes('Maximum number of spots reached')) {
+          toast({
+            title: "Cannot place bid",
+            description: "This auction has reached its maximum number of participants",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        toast({
+          title: "Error placing bid",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setBidAmount('');
+      toast({
+        title: "Bid placed successfully",
+        description: "Proceed to payment to secure your bid",
+      });
+
+      // Redirect to payment page
+      navigate(`/payment/${data.id}`);
+    } catch (error) {
+      console.error('Error placing bid:', error);
       toast({
         title: "Error placing bid",
-        description: error.message,
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
-      return;
     }
-
-    setBidAmount('');
-    toast({
-      title: "Bid placed successfully",
-      description: "Proceed to payment to secure your bid",
-    });
-
-    // Redirect to payment page
-    navigate(`/payment/${data.id}`);
   };
 
   if (!auction) {
