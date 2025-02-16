@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -41,11 +40,13 @@ interface Bid {
     ends_at: string;
     current_price: number;
   };
-  payments: Payment[]; // Changed from payment? to payments
+  payments: Payment[];
 }
 
 interface WonAuction {
   id: string;
+  status: string;
+  payment_deadline: string;
   auction: {
     id: string;
     title: string;
@@ -54,7 +55,7 @@ interface WonAuction {
   winning_bid: {
     id: string;
     amount: number;
-    payments: Payment[]; // Changed from payment? to payments
+    payments: Payment[];
   };
 }
 
@@ -74,7 +75,6 @@ export default function UserDashboard() {
   const fetchUserData = async () => {
     setIsLoading(true);
     try {
-      // Fetch active bids with auction details
       const { data: bidsData, error: bidsError } = await supabase
         .from('bids')
         .select(`
@@ -100,11 +100,12 @@ export default function UserDashboard() {
       if (bidsError) throw bidsError;
       setActiveBids(bidsData || []);
 
-      // Fetch won auctions - Updated to include amount in payments selection
       const { data: wonData, error: wonError } = await supabase
         .from('auction_winners')
         .select(`
           id,
+          status,
+          payment_deadline,
           auction:auctions (
             id,
             title,
@@ -139,7 +140,6 @@ export default function UserDashboard() {
   const getPaymentStatusBadge = (payments: Payment[] | undefined) => {
     if (!payments || payments.length === 0) return <Badge variant="secondary">No Payment</Badge>;
     
-    // Get the latest payment
     const latestPayment = payments[0];
     
     switch (latestPayment.status) {
@@ -151,6 +151,29 @@ export default function UserDashboard() {
         return <Badge variant="destructive">Failed</Badge>;
       default:
         return <Badge variant="outline">{latestPayment.status}</Badge>;
+    }
+  };
+
+  const getWinnerStatusBadge = (auction: WonAuction) => {
+    const deadline = new Date(auction.payment_deadline);
+    const now = new Date();
+
+    switch (auction.status) {
+      case 'pending_payment':
+        return (
+          <div className="flex flex-col">
+            <Badge variant="warning">Payment Required</Badge>
+            <span className="text-xs text-muted-foreground mt-1">
+              Due {format(deadline, 'PPp')}
+            </span>
+          </div>
+        );
+      case 'payment_missed':
+        return <Badge variant="destructive">Payment Missed</Badge>;
+      case 'paid':
+        return <Badge variant="success">Paid</Badge>;
+      default:
+        return <Badge variant="secondary">{auction.status}</Badge>;
     }
   };
 
@@ -260,7 +283,7 @@ export default function UserDashboard() {
                         {format(new Date(won.auction.ends_at), 'PPp')}
                       </TableCell>
                       <TableCell>
-                        {getPaymentStatusBadge(won.winning_bid.payments)}
+                        {getWinnerStatusBadge(won)}
                       </TableCell>
                       <TableCell>
                         <div className="space-x-2">
@@ -271,8 +294,7 @@ export default function UserDashboard() {
                           >
                             View Auction
                           </Button>
-                          {(!won.winning_bid.payments || won.winning_bid.payments.length === 0 || 
-                            won.winning_bid.payments[0].status === 'failed') && (
+                          {won.status === 'pending_payment' && (
                             <Button
                               size="sm"
                               onClick={() => handlePayment(won.winning_bid.id)}

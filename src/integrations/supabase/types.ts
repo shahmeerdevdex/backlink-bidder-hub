@@ -14,6 +14,8 @@ export type Database = {
           auction_id: string | null
           created_at: string | null
           id: string
+          payment_deadline: string | null
+          status: string | null
           user_id: string | null
           winning_bid_id: string | null
         }
@@ -21,6 +23,8 @@ export type Database = {
           auction_id?: string | null
           created_at?: string | null
           id?: string
+          payment_deadline?: string | null
+          status?: string | null
           user_id?: string | null
           winning_bid_id?: string | null
         }
@@ -28,6 +32,8 @@ export type Database = {
           auction_id?: string | null
           created_at?: string | null
           id?: string
+          payment_deadline?: string | null
+          status?: string | null
           user_id?: string | null
           winning_bid_id?: string | null
         }
@@ -271,6 +277,10 @@ export type Database = {
           p_type: string
           p_message: string
         }
+        Returns: undefined
+      }
+      process_missed_payments: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
     }
