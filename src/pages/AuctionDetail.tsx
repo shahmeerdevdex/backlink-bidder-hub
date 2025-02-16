@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { Clock, Users } from 'lucide-react';
+import { Clock, Users, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Auction {
@@ -37,6 +37,16 @@ export default function AuctionDetail() {
   const [bidAmount, setBidAmount] = useState<string>('');
   const [timeLeft, setTimeLeft] = useState<string>('');
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get current user
+    const fetchCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user?.id || null);
+    };
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     const fetchAuction = async () => {
@@ -109,7 +119,14 @@ export default function AuctionDetail() {
   }, [auction]);
 
   const handleBid = async () => {
-    if (!auction) return;
+    if (!auction || !currentUser) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to place a bid",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const amount = parseInt(bidAmount);
     if (isNaN(amount) || amount <= auction.current_price) {
@@ -128,7 +145,8 @@ export default function AuctionDetail() {
           {
             auction_id: auction.id,
             amount: amount,
-            status: 'active'
+            status: 'active',
+            user_id: currentUser
           }
         ])
         .select()
@@ -169,6 +187,28 @@ export default function AuctionDetail() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleCancelBid = async (bidId: string) => {
+    const { error } = await supabase
+      .from('bids')
+      .update({ status: 'cancelled' })
+      .eq('id', bidId)
+      .eq('user_id', currentUser); // Ensure user can only cancel their own bids
+
+    if (error) {
+      toast({
+        title: "Error cancelling bid",
+        description: "Could not cancel your bid at this time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Bid cancelled",
+      description: "Your bid has been cancelled successfully",
+    });
   };
 
   if (!auction) {
@@ -219,7 +259,7 @@ export default function AuctionDetail() {
                   />
                   <Button 
                     onClick={handleBid}
-                    disabled={auction.filled_spots >= auction.max_spots}
+                    disabled={auction.filled_spots >= auction.max_spots || !currentUser}
                   >
                     Place Bid
                   </Button>
@@ -232,10 +272,24 @@ export default function AuctionDetail() {
               <div className="space-y-2">
                 {bids.map((bid) => (
                   <div key={bid.id} className="flex justify-between items-center p-2 bg-secondary/10 rounded">
-                    <span>${bid.amount}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
+                    <span className={bid.status === 'cancelled' ? 'text-muted-foreground line-through' : ''}>
+                      ${bid.amount}
                     </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
+                      </span>
+                      {bid.user_id === currentUser && bid.status === 'active' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleCancelBid(bid.id)}
+                          className="h-8 w-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {bids.length === 0 && (
