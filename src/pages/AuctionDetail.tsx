@@ -82,13 +82,13 @@ export default function AuctionDetail() {
     fetchAuction();
     fetchBids();
 
-    // Subscribe to realtime updates for both auctions and bids
+    // Subscribe to auction updates
     const auctionChannel = supabase
-      .channel('auction-updates')
+      .channel('auction-detail-updates')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'auctions', filter: `id=eq.${id}` },
-        (payload) => {
-          console.log('Auction update received:', payload);
+        async (payload) => {
+          console.log('Auction detail update received:', payload);
           if (payload.new) {
             setAuction(payload.new as Auction);
           }
@@ -96,13 +96,13 @@ export default function AuctionDetail() {
       )
       .subscribe();
 
+    // Subscribe to bid updates
     const bidsChannel = supabase
-      .channel('bids-updates')
+      .channel('bids-detail-updates')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'bids', filter: `auction_id=eq.${id}` },
-        async (payload) => {
-          console.log('Bid update received:', payload);
-          // Fetch all bids again to ensure correct ordering
+        async () => {
+          console.log('Bid update received, fetching latest bids');
           const { data } = await supabase
             .from('bids')
             .select('*')
@@ -110,6 +110,7 @@ export default function AuctionDetail() {
             .order('amount', { ascending: false });
           
           if (data) {
+            console.log('Updated bids:', data);
             setBids(data);
           }
         }
