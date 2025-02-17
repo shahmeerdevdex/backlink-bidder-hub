@@ -34,6 +34,7 @@ export default function AuctionDetail() {
   const [newBidAmount, setNewBidAmount] = useState('');
   const [showBids, setShowBids] = useState(false);
   const [bids, setBids] = useState<any[]>([]);
+  const [userBid, setUserBid] = useState<any>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -41,6 +42,9 @@ export default function AuctionDetail() {
   useEffect(() => {
     fetchAuction();
     fetchBids();
+    if (user) {
+      fetchUserBid();
+    }
 
     const channel = supabase
       .channel('any')
@@ -51,6 +55,9 @@ export default function AuctionDetail() {
           console.log('Change received!', payload)
           fetchAuction();
           fetchBids();
+          if (user) {
+            fetchUserBid();
+          }
         }
       )
       .subscribe()
@@ -58,7 +65,7 @@ export default function AuctionDetail() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [id]);
+  }, [id, user]);
 
   const fetchAuction = async () => {
     if (!id) return;
@@ -79,6 +86,27 @@ export default function AuctionDetail() {
     }
 
     setAuction(data || null);
+  };
+
+  const fetchUserBid = async () => {
+    if (!id || !user) return;
+
+    const { data, error } = await supabase
+      .from('bids')
+      .select('*')
+      .eq('auction_id', id)
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('amount', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is the error code for no rows returned
+      console.error('Error fetching user bid:', error);
+      return;
+    }
+
+    setUserBid(data || null);
   };
 
   const fetchBids = async () => {
@@ -154,6 +182,9 @@ export default function AuctionDetail() {
       console.error('Error updating auction price:', updateError);
     }
 
+    // Update local user bid
+    setUserBid(newBid);
+
     // Clear the bid input
     setNewBidAmount('');
 
@@ -164,7 +195,7 @@ export default function AuctionDetail() {
   };
 
   const handlePayment = async () => {
-    if (!user || !auction) return;
+    if (!user || !auction || !userBid) return;
     
     try {
       const response = await fetch('/api/create-checkout-session', {
@@ -175,7 +206,8 @@ export default function AuctionDetail() {
         body: JSON.stringify({
           auctionId: auction.id,
           userId: user.id,
-          amount: auction.current_price,
+          amount: userBid.amount, // Use the user's bid amount instead of current price
+          bidId: userBid.id,
         }),
       });
 
@@ -241,9 +273,11 @@ export default function AuctionDetail() {
                 <Button className="flex-1" onClick={handlePlaceBid}>
                   Place Bid
                 </Button>
-                <Button className="flex-1" onClick={handlePayment} variant="secondary">
-                  Pay Now
-                </Button>
+                {userBid && (
+                  <Button className="flex-1" onClick={handlePayment} variant="secondary">
+                    Pay Now (${userBid.amount})
+                  </Button>
+                )}
               </div>
             </div>
           ) : (
