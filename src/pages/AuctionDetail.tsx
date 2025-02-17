@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { Clock, Users, X } from 'lucide-react';
+import { CheckCircle, Clock, Users, X, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Auction {
@@ -38,15 +38,34 @@ export default function AuctionDetail() {
   const [timeLeft, setTimeLeft] = useState<string>('');
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [topBidders, setTopBidders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // Get current user
     const fetchCurrentUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user?.id || null);
     };
     fetchCurrentUser();
   }, []);
+
+  useEffect(() => {
+    const updateTopBidders = () => {
+      const uniqueBidders = new Set<string>();
+      const activeBids = bids.filter(bid => bid.status === 'active')
+        .sort((a, b) => b.amount - a.amount);
+      
+      for (const bid of activeBids) {
+        if (uniqueBidders.size < (auction?.max_spots || 3)) {
+          uniqueBidders.add(bid.user_id);
+        } else {
+          break;
+        }
+      }
+      setTopBidders(uniqueBidders);
+    };
+
+    updateTopBidders();
+  }, [bids, auction?.max_spots]);
 
   useEffect(() => {
     const fetchAuction = async () => {
@@ -82,7 +101,6 @@ export default function AuctionDetail() {
     fetchAuction();
     fetchBids();
 
-    // Subscribe to auction updates
     const auctionChannel = supabase
       .channel('auction-detail-updates')
       .on('postgres_changes', 
@@ -96,7 +114,6 @@ export default function AuctionDetail() {
       )
       .subscribe();
 
-    // Subscribe to bid updates
     const bidsChannel = supabase
       .channel('bids-detail-updates')
       .on('postgres_changes',
@@ -112,6 +129,15 @@ export default function AuctionDetail() {
           if (data) {
             console.log('Updated bids:', data);
             setBids(data);
+            
+            // Update current price from highest active bid
+            const highestBid = data.find(bid => bid.status === 'active');
+            if (highestBid && auction) {
+              setAuction({
+                ...auction,
+                current_price: highestBid.amount
+              });
+            }
           }
         }
       )
@@ -176,7 +202,6 @@ export default function AuctionDetail() {
         .single();
 
       if (error) {
-        // Check for max spots error
         if (error.message.includes('Maximum number of spots reached')) {
           toast({
             title: "Cannot place bid",
@@ -217,7 +242,7 @@ export default function AuctionDetail() {
       .from('bids')
       .update({ status: 'cancelled' })
       .eq('id', bidId)
-      .eq('user_id', currentUser); // Ensure user can only cancel their own bids
+      .eq('user_id', currentUser);
 
     if (error) {
       toast({
@@ -293,28 +318,43 @@ export default function AuctionDetail() {
             <div>
               <h3 className="text-xl font-semibold mb-4">Bid History</h3>
               <div className="space-y-2">
-                {bids.map((bid) => (
-                  <div key={bid.id} className="flex justify-between items-center p-2 bg-secondary/10 rounded">
-                    <span className={bid.status === 'cancelled' ? 'text-muted-foreground line-through' : ''}>
-                      ${bid.amount}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
-                      </span>
-                      {bid.user_id === currentUser && bid.status === 'active' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleCancelBid(bid.id)}
-                          className="h-8 w-8"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
+                {bids.map((bid) => {
+                  const isUserInTopSpots = topBidders.has(bid.user_id);
+                  const isCurrentUserBid = bid.user_id === currentUser;
+                  const bidStyle = isCurrentUserBid ? 
+                    (isUserInTopSpots ? "bg-green-100" : "bg-red-100") : 
+                    "bg-secondary/10";
+
+                  return (
+                    <div key={bid.id} className={`flex justify-between items-center p-2 rounded ${bidStyle}`}>
+                      <div className="flex items-center gap-2">
+                        {isCurrentUserBid && (
+                          isUserInTopSpots ? 
+                            <CheckCircle className="w-4 h-4 text-green-600" /> :
+                            <XCircle className="w-4 h-4 text-red-600" />
+                        )}
+                        <span className={bid.status === 'cancelled' ? 'text-muted-foreground line-through' : ''}>
+                          ${bid.amount}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
+                        </span>
+                        {bid.user_id === currentUser && bid.status === 'active' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleCancelBid(bid.id)}
+                            className="h-8 w-8"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {bids.length === 0 && (
                   <p className="text-muted-foreground">No bids yet</p>
                 )}
