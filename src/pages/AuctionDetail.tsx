@@ -80,6 +80,7 @@ export default function AuctionDetail() {
         return;
       }
 
+      console.log('Initial auction data:', data);
       setAuction(data);
     };
 
@@ -95,57 +96,74 @@ export default function AuctionDetail() {
         return;
       }
 
+      console.log('Initial bids data:', data);
       setBids(data || []);
     };
 
     fetchAuction();
     fetchBids();
 
-    const auctionChannel = supabase
-      .channel('auction-detail-updates')
+    // Create a single channel for both auction and bid updates
+    const channel = supabase
+      .channel('auction-and-bids-updates')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'auctions', filter: `id=eq.${id}` },
-        async (payload) => {
-          console.log('Auction detail update received:', payload);
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'auctions', 
+          filter: `id=eq.${id}` 
+        },
+        (payload) => {
+          console.log('Auction update received:', payload);
           if (payload.new) {
             setAuction(payload.new as Auction);
           }
         }
       )
-      .subscribe();
-
-    const bidsChannel = supabase
-      .channel('bids-detail-updates')
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'bids', filter: `auction_id=eq.${id}` },
-        async () => {
-          console.log('Bid update received, fetching latest bids');
-          const { data } = await supabase
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'bids', 
+          filter: `auction_id=eq.${id}` 
+        },
+        async (payload) => {
+          console.log('Bid update received:', payload);
+          // Fetch latest bids
+          const { data: bidsData } = await supabase
             .from('bids')
             .select('*')
             .eq('auction_id', id)
             .order('amount', { ascending: false });
           
-          if (data) {
-            console.log('Updated bids:', data);
-            setBids(data);
-            
-            // Update current price from highest active bid
-            const highestBid = data.find(bid => bid.status === 'active');
-            if (highestBid && auction) {
-              setAuction({
-                ...auction,
-                current_price: highestBid.amount
-              });
+          if (bidsData) {
+            console.log('Updated bids:', bidsData);
+            setBids(bidsData);
+
+            // Update auction with new highest bid
+            const highestActiveBid = bidsData.find(bid => bid.status === 'active');
+            if (highestActiveBid) {
+              // Fetch latest auction data to ensure we have the most up-to-date state
+              const { data: auctionData } = await supabase
+                .from('auctions')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+              if (auctionData) {
+                console.log('Updated auction data:', auctionData);
+                setAuction(auctionData);
+              }
             }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
     return () => {
-      supabase.removeChannel(auctionChannel);
-      supabase.removeChannel(bidsChannel);
+      supabase.removeChannel(channel);
     };
   }, [id]);
 
