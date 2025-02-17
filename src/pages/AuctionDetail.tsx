@@ -2,19 +2,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { useAuth } from '@/components/AuthProvider';
-import { format } from 'date-fns';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Clock, Users, X } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface Auction {
   id: string;
@@ -25,289 +19,309 @@ interface Auction {
   max_spots: number;
   filled_spots: number;
   ends_at: string;
-  creator_id: string;
+}
+
+interface Bid {
+  id: string;
+  amount: number;
+  created_at: string;
+  user_id: string;
+  status: string;
 }
 
 export default function AuctionDetail() {
   const { id } = useParams();
-  const [auction, setAuction] = useState<Auction | null>(null);
-  const [newBidAmount, setNewBidAmount] = useState('');
-  const [showBids, setShowBids] = useState(false);
-  const [bids, setBids] = useState<any[]>([]);
-  const [userBid, setUserBid] = useState<any>(null);
-  const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const [auction, setAuction] = useState<Auction | null>(null);
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [bidAmount, setBidAmount] = useState<string>('');
+  const [timeLeft, setTimeLeft] = useState<string>('');
+  const { toast } = useToast();
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
 
   useEffect(() => {
+    // Get current user
+    const fetchCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user?.id || null);
+    };
+    fetchCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    const fetchAuction = async () => {
+      const { data, error } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching auction:', error);
+        return;
+      }
+
+      setAuction(data);
+    };
+
+    const fetchBids = async () => {
+      const { data, error } = await supabase
+        .from('bids')
+        .select('*')
+        .eq('auction_id', id)
+        .order('amount', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching bids:', error);
+        return;
+      }
+
+      setBids(data || []);
+    };
+
     fetchAuction();
     fetchBids();
-    if (user) {
-      fetchUserBid();
-    }
 
-    const channel = supabase
-      .channel('any')
-      .on(
-        'postgres_changes',
+    // Subscribe to auction updates
+    const auctionChannel = supabase
+      .channel('auction-detail-updates')
+      .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'auctions', filter: `id=eq.${id}` },
-        (payload) => {
-          console.log('Change received!', payload)
-          fetchAuction();
-          fetchBids();
-          if (user) {
-            fetchUserBid();
+        async (payload) => {
+          console.log('Auction detail update received:', payload);
+          if (payload.new) {
+            setAuction(payload.new as Auction);
           }
         }
       )
-      .subscribe()
+      .subscribe();
+
+    // Subscribe to bid updates
+    const bidsChannel = supabase
+      .channel('bids-detail-updates')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'bids', filter: `auction_id=eq.${id}` },
+        async () => {
+          console.log('Bid update received, fetching latest bids');
+          const { data } = await supabase
+            .from('bids')
+            .select('*')
+            .eq('auction_id', id)
+            .order('amount', { ascending: false });
+          
+          if (data) {
+            console.log('Updated bids:', data);
+            setBids(data);
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [id, user]);
+      supabase.removeChannel(auctionChannel);
+      supabase.removeChannel(bidsChannel);
+    };
+  }, [id]);
 
-  const fetchAuction = async () => {
-    if (!id) return;
+  useEffect(() => {
+    if (!auction) return;
 
-    const { data, error } = await supabase
-      .from('auctions')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const updateTimeLeft = () => {
+      const end = new Date(auction.ends_at);
+      if (end > new Date()) {
+        setTimeLeft(formatDistanceToNow(end, { addSuffix: true }));
+      } else {
+        setTimeLeft('Ended');
+      }
+    };
 
-    if (error) {
+    updateTimeLeft();
+    const interval = setInterval(updateTimeLeft, 60000);
+
+    return () => clearInterval(interval);
+  }, [auction]);
+
+  const handleBid = async () => {
+    if (!auction || !currentUser) {
       toast({
-        title: "Error fetching auction",
-        description: error.message,
+        title: "Error",
+        description: "You must be logged in to place a bid",
         variant: "destructive",
       });
       return;
     }
 
-    setAuction(data || null);
-  };
-
-  const fetchUserBid = async () => {
-    if (!id || !user) return;
-
-    const { data, error } = await supabase
-      .from('bids')
-      .select('*')
-      .eq('auction_id', id)
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('amount', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 is the error code for no rows returned
-      console.error('Error fetching user bid:', error);
-      return;
-    }
-
-    setUserBid(data || null);
-  };
-
-  const fetchBids = async () => {
-    if (!id) return;
-
-    const { data, error } = await supabase
-      .from('bids')
-      .select('*, profiles(username)')
-      .eq('auction_id', id)
-      .order('amount', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching bids:', error);
-      return;
-    }
-
-    setBids(data || []);
-  };
-
-  const handlePlaceBid = async () => {
-    if (!user || !auction) return;
-
-    const bidAmount = parseInt(newBidAmount);
-    if (isNaN(bidAmount)) {
+    const amount = parseInt(bidAmount);
+    if (isNaN(amount) || amount <= auction.current_price) {
       toast({
         title: "Invalid bid amount",
-        description: "Please enter a valid number",
+        description: "Bid must be higher than the current price",
         variant: "destructive",
       });
       return;
     }
 
-    if (bidAmount <= (auction.current_price || auction.starting_price)) {
+    try {
+      const { data, error } = await supabase
+        .from('bids')
+        .insert([
+          {
+            auction_id: auction.id,
+            amount: amount,
+            status: 'active',
+            user_id: currentUser
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        // Check for max spots error
+        if (error.message.includes('Maximum number of spots reached')) {
+          toast({
+            title: "Cannot place bid",
+            description: "This auction has reached its maximum number of participants",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        toast({
+          title: "Error placing bid",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setBidAmount('');
       toast({
-        title: "Bid too low",
-        description: "Your bid must be higher than the current price",
-        variant: "destructive",
+        title: "Bid placed successfully",
+        description: "Proceed to payment to secure your bid",
       });
-      return;
-    }
 
-    // First, insert the new bid
-    const { data: newBid, error: bidError } = await supabase
-      .from('bids')
-      .insert([{
-        auction_id: id,
-        user_id: user.id,
-        amount: bidAmount,
-        status: 'active'
-      }])
-      .select()
-      .single();
-
-    if (bidError) {
+      // Redirect to payment page
+      navigate(`/payment/${data.id}`);
+    } catch (error) {
+      console.error('Error placing bid:', error);
       toast({
         title: "Error placing bid",
-        description: bidError.message,
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelBid = async (bidId: string) => {
+    const { error } = await supabase
+      .from('bids')
+      .update({ status: 'cancelled' })
+      .eq('id', bidId)
+      .eq('user_id', currentUser); // Ensure user can only cancel their own bids
+
+    if (error) {
+      toast({
+        title: "Error cancelling bid",
+        description: "Could not cancel your bid at this time",
         variant: "destructive",
       });
       return;
     }
 
-    // Immediately update the auction's current price
-    const { error: updateError } = await supabase
-      .from('auctions')
-      .update({ 
-        current_price: bidAmount,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
-
-    if (updateError) {
-      console.error('Error updating auction price:', updateError);
-    }
-
-    // Update local user bid
-    setUserBid(newBid);
-
-    // Clear the bid input
-    setNewBidAmount('');
-
     toast({
-      title: "Bid placed successfully",
-      description: `Your bid of $${bidAmount} has been placed.`,
+      title: "Bid cancelled",
+      description: "Your bid has been cancelled successfully",
     });
   };
 
-  const handlePayment = async () => {
-    if (!user || !auction || !userBid) return;
-    
-    try {
-      const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          auctionId: auction.id,
-          userId: user.id,
-          amount: userBid.amount, // Use the user's bid amount instead of current price
-          bidId: userBid.id,
-        }),
-      });
-
-      const session = await response.json();
-      if (session.url) {
-        window.location.href = session.url;
-      }
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      toast({
-        title: "Error",
-        description: "Could not process payment. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
   if (!auction) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <p>Loading auction details...</p>
-      </div>
-    );
+    return <div className="container mx-auto px-4 py-8">Loading...</div>;
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Card>
+      <Card className="mb-8">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">{auction.title}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">{auction.description}</p>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>Starting Price</span>
-              <span className="font-semibold">${auction.starting_price}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Current Price</span>
-              <span className="font-semibold">${auction.current_price}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Spots</span>
-              <span className="font-semibold">{auction.filled_spots}/{auction.max_spots}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Ends At</span>
-              <span className="font-semibold">
-                {format(new Date(auction.ends_at), 'PPp')}
-              </span>
-            </div>
+          <div className="flex justify-between items-start mb-4">
+            <CardTitle className="text-3xl font-bold">{auction.title}</CardTitle>
+            <Badge variant={auction.filled_spots >= auction.max_spots ? "destructive" : "secondary"}>
+              <Users className="w-4 h-4 mr-1" />
+              {auction.filled_spots}/{auction.max_spots} spots
+            </Badge>
           </div>
-          {user ? (
-            <div className="space-y-2">
-              <Input
-                type="number"
-                placeholder="Enter your bid amount"
-                value={newBidAmount}
-                onChange={(e) => setNewBidAmount(e.target.value)}
-              />
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={handlePlaceBid}>
-                  Place Bid
-                </Button>
-                {userBid && (
-                  <Button className="flex-1" onClick={handlePayment} variant="secondary">
-                    Pay Now (${userBid.amount})
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="w-4 h-4" />
+            <span>{timeLeft}</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg mb-6">{auction.description}</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold">Auction Details</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Starting Price</span>
+                  <span className="font-semibold">${auction.starting_price}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Current Highest Bid</span>
+                  <span className="font-semibold">${auction.current_price}</span>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <div className="flex gap-4">
+                  <Input
+                    type="number"
+                    placeholder="Enter bid amount"
+                    value={bidAmount}
+                    onChange={(e) => setBidAmount(e.target.value)}
+                    min={auction.current_price + 1}
+                  />
+                  <Button 
+                    onClick={handleBid}
+                    disabled={auction.filled_spots >= auction.max_spots || !currentUser}
+                  >
+                    Place Bid
                   </Button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold mb-4">Bid History</h3>
+              <div className="space-y-2">
+                {bids.map((bid) => (
+                  <div key={bid.id} className="flex justify-between items-center p-2 bg-secondary/10 rounded">
+                    <span className={bid.status === 'cancelled' ? 'text-muted-foreground line-through' : ''}>
+                      ${bid.amount}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
+                      </span>
+                      {bid.user_id === currentUser && bid.status === 'active' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleCancelBid(bid.id)}
+                          className="h-8 w-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {bids.length === 0 && (
+                  <p className="text-muted-foreground">No bids yet</p>
                 )}
               </div>
             </div>
-          ) : (
-            <p className="text-center text-muted-foreground">
-              Please <Button variant="link" onClick={() => navigate('/login')}>login</Button> to place a bid.
-            </p>
-          )}
+          </div>
         </CardContent>
-        <CardFooter>
-          <Sheet open={showBids} onOpenChange={setShowBids}>
-            <SheetTrigger asChild>
-              <Button className="w-full" variant="outline">
-                View All Bids
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[400px] sm:w-[540px]">
-              <SheetHeader>
-                <SheetTitle>Auction Bids</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4">
-                {bids.map((bid) => (
-                  <div key={bid.id} className="flex justify-between items-center py-2 border-b">
-                    <span>{bid.profiles?.username || 'Anonymous'}</span>
-                    <span className="font-semibold">${bid.amount}</span>
-                  </div>
-                ))}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </CardFooter>
       </Card>
     </div>
   );
