@@ -60,6 +60,16 @@ interface WonAuction {
   };
 }
 
+interface Winner {
+  user_id: string;
+  winning_bid: {
+    amount: number;
+  };
+  profiles: {
+    username: string | null;
+  } | null;
+}
+
 interface CompletedAuction {
   id: string;
   title: string;
@@ -152,15 +162,15 @@ export default function UserDashboard() {
 
       // For each completed auction, get the winners
       const completedWithWinners = await Promise.all((completed || []).map(async (auction) => {
+        // Fix this query to properly join with profiles through user_id
         const { data: winners, error: winnersError } = await supabase
           .from('auction_winners')
           .select(`
             user_id,
-            winning_bid:bids (amount),
-            profiles:user_id (username)
+            winning_bid:bids!inner(amount),
+            profiles:profiles!inner(username)
           `)
-          .eq('auction_id', auction.id)
-          .order('created_at', { ascending: true });
+          .eq('auction_id', auction.id);
 
         if (winnersError) {
           console.error('Error fetching winners:', winnersError);
@@ -171,8 +181,8 @@ export default function UserDashboard() {
           id: auction.id,
           title: auction.title,
           ends_at: auction.ends_at,
-          winners: (winners || []).map(winner => ({
-            username: winner.profiles?.username,
+          winners: (winners || []).map((winner: Winner) => ({
+            username: winner.profiles?.username || 'Anonymous',
             bid_amount: winner.winning_bid.amount,
             is_current_user: winner.user_id === user?.id
           }))
