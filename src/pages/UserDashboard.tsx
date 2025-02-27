@@ -147,15 +147,35 @@ export default function UserDashboard() {
       if (wonError) throw wonError;
       setWonAuctions(wonData || []);
 
-      // Fetch completed auctions
+      // Fetch all auctions the user has participated in that have ended
+      const { data: userBids, error: userBidsError } = await supabase
+        .from('bids')
+        .select('auction_id')
+        .eq('user_id', user?.id)
+        .eq('status', 'active');
+      
+      if (userBidsError) throw userBidsError;
+      
+      // Get unique auction IDs
+      const userAuctionIds = [...new Set((userBids || []).map(bid => bid.auction_id))];
+      
+      if (userAuctionIds.length === 0) {
+        setCompletedAuctions([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch completed auctions that the user has participated in
       const { data: completed, error: completedError } = await supabase
         .from('auctions')
         .select('*')
-        .eq('status', 'completed')
+        .in('id', userAuctionIds)
         .lt('ends_at', new Date().toISOString())
         .order('ends_at', { ascending: false });
 
       if (completedError) throw completedError;
+
+      console.log('Completed auctions:', completed);
 
       // For each completed auction, get the winners
       const completedWithWinners = await Promise.all((completed || []).map(async (auction) => {
