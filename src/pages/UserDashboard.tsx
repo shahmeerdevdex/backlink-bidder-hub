@@ -60,14 +60,11 @@ interface WonAuction {
   };
 }
 
-interface Winner {
+interface AuctionWinner {
   user_id: string;
   winning_bid: {
     amount: number;
   };
-  profiles: {
-    username: string | null;
-  } | null;
 }
 
 interface CompletedAuction {
@@ -162,13 +159,12 @@ export default function UserDashboard() {
 
       // For each completed auction, get the winners
       const completedWithWinners = await Promise.all((completed || []).map(async (auction) => {
-        // Fix this query to properly join with profiles through user_id
+        // Fetch winners for this auction
         const { data: winners, error: winnersError } = await supabase
           .from('auction_winners')
           .select(`
             user_id,
-            winning_bid:bids!inner(amount),
-            profiles:profiles!inner(username)
+            winning_bid:bids(amount)
           `)
           .eq('auction_id', auction.id);
 
@@ -177,15 +173,27 @@ export default function UserDashboard() {
           return null;
         }
 
+        // Get usernames for each winner
+        const winnersWithUsernames = await Promise.all((winners || []).map(async (winner: AuctionWinner) => {
+          // Get the profile data for each winner
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', winner.user_id)
+            .maybeSingle();
+          
+          return {
+            username: profile?.username || 'Anonymous',
+            bid_amount: winner.winning_bid.amount,
+            is_current_user: winner.user_id === user?.id
+          };
+        }));
+
         return {
           id: auction.id,
           title: auction.title,
           ends_at: auction.ends_at,
-          winners: (winners || []).map((winner: Winner) => ({
-            username: winner.profiles?.username || 'Anonymous',
-            bid_amount: winner.winning_bid.amount,
-            is_current_user: winner.user_id === user?.id
-          }))
+          winners: winnersWithUsernames
         };
       }));
 
