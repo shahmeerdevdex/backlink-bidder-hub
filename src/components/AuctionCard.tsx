@@ -133,7 +133,9 @@ export function AuctionCard({
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="w-4 h-4" />
-            <span className="text-sm">{timeLeft}</span>
+            <span className={`text-sm ${isExpired ? "text-red-500 font-semibold" : ""}`}>
+              {timeLeft}
+            </span>
           </div>
         </div>
       </CardContent>
@@ -142,6 +144,7 @@ export function AuctionCard({
           className="w-full" 
           onClick={handleBidClick}
           disabled={isFullyBooked || isExpired}
+          variant={isExpired ? "outline" : "default"}
         >
           {isFullyBooked ? 'Fully Booked' : isExpired ? 'Auction Ended' : 'Place Bid'}
         </Button>
