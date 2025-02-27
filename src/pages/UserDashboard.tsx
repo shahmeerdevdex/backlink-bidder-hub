@@ -78,10 +78,19 @@ interface CompletedAuction {
   }>;
 }
 
+interface Notification {
+  id: string;
+  type: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
 export default function UserDashboard() {
   const [activeBids, setActiveBids] = useState<Bid[]>([]);
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
   const [completedAuctions, setCompletedAuctions] = useState<CompletedAuction[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -90,11 +99,50 @@ export default function UserDashboard() {
   useEffect(() => {
     if (!user) return;
     fetchUserData();
+    fetchNotifications();
   }, [user]);
+
+  const fetchNotifications = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+        
+      if (error) throw error;
+      setNotifications(data || []);
+      
+      // Show unread notifications as toasts
+      data?.filter(n => !n.read).forEach(notification => {
+        toast({
+          title: notification.type === 'winner' ? 'Auction Won!' : 'Notification',
+          description: notification.message,
+        });
+      });
+      
+      // Mark notifications as read
+      if (data && data.length > 0) {
+        const unreadIds = data.filter(n => !n.read).map(n => n.id);
+        if (unreadIds.length > 0) {
+          await supabase
+            .from('notifications')
+            .update({ read: true })
+            .in('id', unreadIds);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
 
   const fetchUserData = async () => {
     setIsLoading(true);
     try {
+      // Fetch active bids
       const { data: bidsData, error: bidsError } = await supabase
         .from('bids')
         .select(`
@@ -120,6 +168,7 @@ export default function UserDashboard() {
       if (bidsError) throw bidsError;
       setActiveBids(bidsData || []);
 
+      // Fetch auctions where user is a winner
       const { data: wonData, error: wonError } = await supabase
         .from('auction_winners')
         .select(`
@@ -218,6 +267,61 @@ export default function UserDashboard() {
       }));
 
       setCompletedAuctions(completedWithWinners.filter(Boolean) as CompletedAuction[]);
+      
+      // Check if user has won any auctions but no entry in auction_winners yet
+      // This can happen if the process_auction_winners function hasn't run
+      const endedAuctions = completed?.filter(auction => {
+        // Check if this auction has already been processed (has winners)
+        const hasWinners = wonData?.some(won => won.auction.id === auction.id);
+        return !hasWinners && new Date(auction.ends_at) < new Date();
+      }) || [];
+      
+      if (endedAuctions.length > 0) {
+        for (const auction of endedAuctions) {
+          // Get top bidders for this auction
+          const { data: topBids, error: topBidsError } = await supabase
+            .from('bids')
+            .select('id, user_id, amount')
+            .eq('auction_id', auction.id)
+            .eq('status', 'active')
+            .order('amount', { ascending: false })
+            .limit(auction.max_spots || 3);
+            
+          if (topBidsError) {
+            console.error('Error fetching top bids:', topBidsError);
+            continue;
+          }
+          
+          // Check if user is in top spots
+          const userBid = topBids?.find(bid => bid.user_id === user?.id);
+          if (userBid) {
+            // Create a temporary "won auction" entry
+            const tempWonAuction: WonAuction = {
+              id: `temp_${auction.id}`,
+              status: 'pending_processing',
+              payment_deadline: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+              auction: {
+                id: auction.id,
+                title: auction.title,
+                ends_at: auction.ends_at
+              },
+              winning_bid: {
+                id: userBid.id,
+                amount: userBid.amount,
+                payments: []
+              }
+            };
+            
+            // Add to won auctions if not already there
+            setWonAuctions(prev => {
+              if (!prev.some(won => won.auction.id === auction.id)) {
+                return [...prev, tempWonAuction];
+              }
+              return prev;
+            });
+          }
+        }
+      }
     } catch (error: any) {
       toast({
         title: "Error fetching data",
@@ -247,6 +351,10 @@ export default function UserDashboard() {
   };
 
   const getWinnerStatusBadge = (auction: WonAuction) => {
+    if (auction.status === 'pending_processing') {
+      return <Badge variant="secondary">Processing</Badge>;
+    }
+    
     const deadline = new Date(auction.payment_deadline);
     const now = new Date();
 
