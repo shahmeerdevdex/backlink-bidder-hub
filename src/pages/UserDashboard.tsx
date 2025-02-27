@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -21,7 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { Award, Clock, CreditCard } from 'lucide-react';
+import { Award, Clock, CreditCard, Trophy } from 'lucide-react';
 
 interface Payment {
   id: string;
@@ -59,9 +60,21 @@ interface WonAuction {
   };
 }
 
+interface CompletedAuction {
+  id: string;
+  title: string;
+  ends_at: string;
+  winners: Array<{
+    username: string | null;
+    bid_amount: number;
+    is_current_user: boolean;
+  }>;
+}
+
 export default function UserDashboard() {
   const [activeBids, setActiveBids] = useState<Bid[]>([]);
   const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
+  const [completedAuctions, setCompletedAuctions] = useState<CompletedAuction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -126,6 +139,47 @@ export default function UserDashboard() {
 
       if (wonError) throw wonError;
       setWonAuctions(wonData || []);
+
+      // Fetch completed auctions
+      const { data: completed, error: completedError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('status', 'completed')
+        .lt('ends_at', new Date().toISOString())
+        .order('ends_at', { ascending: false });
+
+      if (completedError) throw completedError;
+
+      // For each completed auction, get the winners
+      const completedWithWinners = await Promise.all((completed || []).map(async (auction) => {
+        const { data: winners, error: winnersError } = await supabase
+          .from('auction_winners')
+          .select(`
+            user_id,
+            winning_bid:bids (amount),
+            profiles:user_id (username)
+          `)
+          .eq('auction_id', auction.id)
+          .order('created_at', { ascending: true });
+
+        if (winnersError) {
+          console.error('Error fetching winners:', winnersError);
+          return null;
+        }
+
+        return {
+          id: auction.id,
+          title: auction.title,
+          ends_at: auction.ends_at,
+          winners: (winners || []).map(winner => ({
+            username: winner.profiles?.username,
+            bid_amount: winner.winning_bid.amount,
+            is_current_user: winner.user_id === user?.id
+          }))
+        };
+      }));
+
+      setCompletedAuctions(completedWithWinners.filter(Boolean) as CompletedAuction[]);
     } catch (error: any) {
       toast({
         title: "Error fetching data",
@@ -198,6 +252,10 @@ export default function UserDashboard() {
           <TabsTrigger value="won">
             <Award className="w-4 h-4 mr-2" />
             Won Auctions
+          </TabsTrigger>
+          <TabsTrigger value="completed">
+            <Trophy className="w-4 h-4 mr-2" />
+            Completed Auctions
           </TabsTrigger>
           <TabsTrigger value="payments">
             <CreditCard className="w-4 h-4 mr-2" />
@@ -310,6 +368,72 @@ export default function UserDashboard() {
                     <TableRow>
                       <TableCell colSpan={5} className="text-center">
                         You haven't won any auctions yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="completed">
+          <Card>
+            <CardHeader>
+              <CardTitle>Completed Auctions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Auction</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Winners</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {completedAuctions.map((auction) => (
+                    <TableRow key={auction.id}>
+                      <TableCell>{auction.title}</TableCell>
+                      <TableCell>
+                        {format(new Date(auction.ends_at), 'PPp')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          {auction.winners.map((winner, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <Badge variant={winner.is_current_user ? "default" : "secondary"}>
+                                {index + 1}
+                              </Badge>
+                              <span className={winner.is_current_user ? "font-semibold" : ""}>
+                                {winner.username || 'Anonymous'}: ${winner.bid_amount}
+                              </span>
+                              {winner.is_current_user && (
+                                <Trophy className="w-4 h-4 text-yellow-500" />
+                              )}
+                            </div>
+                          ))}
+                          {auction.winners.length === 0 && (
+                            <span className="text-muted-foreground">No winners yet</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/auctions/${auction.id}`)}
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {completedAuctions.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center">
+                        No completed auctions available.
                       </TableCell>
                     </TableRow>
                   )}

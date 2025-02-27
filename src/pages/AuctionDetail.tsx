@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -219,11 +220,8 @@ export default function AuctionDetail() {
       setBidAmount('');
       toast({
         title: "Bid placed successfully",
-        description: "Proceed to payment to secure your bid",
+        description: "Your bid has been recorded",
       });
-
-      // Redirect to payment page
-      navigate(`/payment/${data.id}`);
     } catch (error) {
       console.error('Error placing bid:', error);
       toast({
