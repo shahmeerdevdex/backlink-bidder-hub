@@ -39,6 +39,7 @@ export default function AuctionDetail() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [topBidders, setTopBidders] = useState<Set<string>>(new Set());
   const [emailsSent, setEmailsSent] = useState<boolean>(false);
+  const [isSendingEmails, setIsSendingEmails] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -65,6 +66,7 @@ export default function AuctionDetail() {
     };
     updateTopBidders();
   }, [bids, auction?.max_spots]);
+
   useEffect(() => {
     const fetchAuction = async () => {
       const { data, error } = await supabase
@@ -79,6 +81,7 @@ export default function AuctionDetail() {
       }
 
       setAuction(data);
+      setEmailsSent(data.winners_processed || false);
     };
 
     const fetchBids = async () => {
@@ -128,7 +131,6 @@ export default function AuctionDetail() {
             console.log('Updated bids:', data);
             setBids(data);
             
-            // Update current price from highest active bid
             const highestBid = data.find(bid => bid.status === 'active');
             if (highestBid && auction) {
               setAuction({
@@ -166,34 +168,65 @@ export default function AuctionDetail() {
   }, [auction]);
 
   useEffect(() => {
-    if (auction && new Date(auction.ends_at) <= new Date() && topBidders.size > 0 && !emailsSent) {
-      // Check if the auction has ended and we have top bidders
+    if (auction && 
+        new Date(auction.ends_at) <= new Date() && 
+        topBidders.size > 0 && 
+        !emailsSent && 
+        !isSendingEmails) {
+      
       const sendWinnerEmails = async () => {
+        setIsSendingEmails(true);
+        
         try {
+          console.log('Calling send-winner-email function for auction:', auction.id);
+          
           const { data, error } = await supabase.functions.invoke('send-winner-email', {
             body: { auctionId: auction.id }
           });
 
           if (error) {
             console.error('Error sending winner emails:', error);
+            toast({
+              title: "Error sending winner emails",
+              description: error.message || "Please try again later",
+              variant: "destructive"
+            });
             return;
           }
 
-          console.log('Winner emails sent:', data);
+          console.log('Winner emails response:', data);
           setEmailsSent(true);
           
-          toast({
-            title: "Winner emails sent",
-            description: "Email notifications have been sent to auction winners"
-          });
+          if (data.successCount > 0) {
+            toast({
+              title: "Winner emails sent",
+              description: `${data.successCount} email notifications have been sent to auction winners`
+            });
+          } else {
+            toast({
+              title: "No emails sent",
+              description: "No eligible winners found or all emails failed to send",
+              variant: "destructive"
+            });
+          }
+          
+          setAuction(prev => prev ? {...prev, winners_processed: true} : null);
+          
         } catch (error) {
           console.error('Error invoking send-winner-email function:', error);
+          toast({
+            title: "Error sending winner emails",
+            description: "An unexpected error occurred",
+            variant: "destructive"
+          });
+        } finally {
+          setIsSendingEmails(false);
         }
       };
 
       sendWinnerEmails();
     }
-  }, [auction, topBidders, emailsSent, toast]);
+  }, [auction, topBidders, emailsSent, toast, isSendingEmails]);
 
   const handleBid = async () => {
     if (!auction || !currentUser) {
@@ -294,10 +327,18 @@ export default function AuctionDetail() {
         <CardHeader>
           <div className="flex justify-between items-start mb-4">
             <CardTitle className="text-3xl font-bold">{auction.title}</CardTitle>
-            <Badge variant={auction.filled_spots >= auction.max_spots ? "destructive" : "secondary"}>
-              <Users className="w-4 h-4 mr-1" />
-              {auction.filled_spots}/{auction.max_spots} spots
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge variant={auction.filled_spots >= auction.max_spots ? "destructive" : "secondary"}>
+                <Users className="w-4 h-4 mr-1" />
+                {auction.filled_spots}/{auction.max_spots} spots
+              </Badge>
+              
+              {new Date(auction.ends_at) <= new Date() && (
+                <Badge variant={emailsSent ? "success" : "outline"}>
+                  {emailsSent ? "Emails sent" : "Emails pending"}
+                </Badge>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="w-4 h-4" />
