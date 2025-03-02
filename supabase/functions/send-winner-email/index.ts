@@ -1,195 +1,206 @@
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.1";
-import { Resend } from "npm:resend@2.0.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { Resend } from 'npm:resend@2.0.0'
 
-// Initialize Supabase client with service role key (needed to access user emails)
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Initialize Supabase client with admin privileges
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Initialize Resend for email sending
-const resendApiKey = Deno.env.get("RESEND_API_KEY");
-const resend = new Resend(resendApiKey);
+// Initialize Resend email client
+const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? ''
+const resend = new Resend(resendApiKey)
 
-if (!resendApiKey) {
-  console.error("RESEND_API_KEY is not set. Emails cannot be sent!");
+// CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const handler = async (req: Request): Promise<Response> => {
+Deno.serve(async (req) => {
+  console.log('Received request to send-winner-email function')
+  
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request (CORS preflight)')
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    console.log("Starting send-winner-email function");
+    // Parse the request body
+    const requestData = await req.json()
+    const { auctionId } = requestData
     
-    const { auctionId } = await req.json();
+    console.log(`Processing auction ID: ${auctionId}`)
+    console.log(`Resend API Key exists: ${!!resendApiKey}`)
     
     if (!auctionId) {
-      console.error("Auction ID is missing in request");
+      console.error('Missing required parameter: auctionId')
       return new Response(
-        JSON.stringify({ error: "Auction ID is required" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+        JSON.stringify({ error: 'Missing required parameter: auctionId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    console.log(`Processing winner emails for auction: ${auctionId}`);
-
-    // Fetch the auction details
+    // Get auction details
+    console.log(`Fetching auction details for ID: ${auctionId}`)
     const { data: auction, error: auctionError } = await supabase
-      .from("auctions")
-      .select("*")
-      .eq("id", auctionId)
-      .single();
+      .from('auctions')
+      .select('*')
+      .eq('id', auctionId)
+      .single()
 
-    if (auctionError || !auction) {
-      console.error("Error fetching auction:", auctionError);
+    if (auctionError) {
+      console.error(`Error fetching auction: ${auctionError.message}`)
       return new Response(
-        JSON.stringify({ error: "Auction not found", details: auctionError }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+        JSON.stringify({ error: `Error fetching auction: ${auctionError.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    console.log("Auction found:", auction.title);
+    console.log(`Auction data retrieved: ${JSON.stringify(auction)}`)
+    
+    // Find winners (top bidders based on max_spots)
+    console.log(`Fetching top bidders for auction with max_spots: ${auction.max_spots}`)
+    const { data: topBids, error: bidsError } = await supabase
+      .from('bids')
+      .select('id, user_id, amount')
+      .eq('auction_id', auctionId)
+      .eq('status', 'active')
+      .order('amount', { ascending: false })
+      .limit(auction.max_spots || 3)
 
-    // Get top bidders for this auction up to max_spots
-    const { data: topBids, error: topBidsError } = await supabase
-      .from("bids")
-      .select("id, user_id, amount")
-      .eq("auction_id", auctionId)
-      .eq("status", "active")
-      .order("amount", { ascending: false })
-      .limit(auction.max_spots);
-
-    if (topBidsError) {
-      console.error("Error fetching top bids:", topBidsError);
+    if (bidsError) {
+      console.error(`Error fetching top bids: ${bidsError.message}`)
       return new Response(
-        JSON.stringify({ error: "Error fetching top bids", details: topBidsError }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+        JSON.stringify({ error: `Error fetching top bids: ${bidsError.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    console.log(`Found ${topBids?.length || 0} top bidders to notify`);
+    console.log(`Found ${topBids?.length || 0} top bidders`)
+    console.log(`Top bids data: ${JSON.stringify(topBids)}`)
 
     if (!topBids || topBids.length === 0) {
+      console.log('No eligible winners found')
       return new Response(
-        JSON.stringify({ message: "No winners to notify" }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
+        JSON.stringify({ message: 'No eligible winners found', successCount: 0 }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Send emails to each winner
-    const emailPromises = topBids.map(async (bid) => {
-      try {
-        // Get the user profile to get the email
-        const { data: user, error: userError } = await supabase.auth.admin.getUserById(bid.user_id);
-
-        if (userError || !user) {
-          console.error(`Error fetching user ${bid.user_id}:`, userError);
-          return { userId: bid.user_id, success: false, error: "User not found" };
-        }
-
-        const email = user.user.email;
-        if (!email) {
-          console.error(`No email found for user ${bid.user_id}`);
-          return { userId: bid.user_id, success: false, error: "User email not found" };
-        }
-
-        // Create a notification for the winner
-        await supabase.from("notifications").insert({
-          user_id: bid.user_id,
-          type: "winner",
-          message: `Congratulations! You won the auction: ${auction.title}`,
-          auction_id: auctionId
-        });
-
-        console.log(`Sending winner email to ${email} for auction ${auction.title}`);
-        
-        // Send the email
-        const emailResponse = await resend.emails.send({
-          from: "Auction Platform <onboarding@resend.dev>",
-          to: [email],
-          subject: `Congratulations! You won the auction: ${auction.title}`,
-          html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #2563eb;">Congratulations! 🎉</h1>
-              <p>You are a winner in the auction: <strong>${auction.title}</strong></p>
-              <p>Your winning bid amount: <strong>$${bid.amount}</strong></p>
-              <p>Here are the details:</p>
-              <ul>
-                <li><strong>Auction Title:</strong> ${auction.title}</li>
-                <li><strong>Description:</strong> ${auction.description}</li>
-                <li><strong>Your Bid Amount:</strong> $${bid.amount}</li>
-              </ul>
-              <p style="color: #ef4444; font-weight: bold;">Important: Please complete your payment soon to secure your win!</p>
-              <a href="${supabaseUrl.replace('.supabase.co', '.app')}/payment-page?bid_id=${bid.id}" style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 20px;">
-                Pay Now
-              </a>
-              <p style="margin-top: 30px; font-size: 0.8em; color: #64748b;">
-                If you have any questions, please contact our support team.
-              </p>
-            </div>
-          `,
-        });
-
-        console.log(`Email sent to user ${bid.user_id}:`, emailResponse);
-        return { userId: bid.user_id, success: true, data: emailResponse };
-      } catch (error) {
-        console.error(`Error sending email to user ${bid.user_id}:`, error);
-        return { userId: bid.user_id, success: false, error: error.message };
-      }
-    });
-
-    const emailResults = await Promise.all(emailPromises);
-    console.log("Email sending results:", emailResults);
+    // Process each winner
+    let successCount = 0
+    const emailPromises = []
     
-    // Update the auction to mark winners as processed
-    await supabase
-      .from("auctions")
+    for (const bid of topBids) {
+      // Get user details for email
+      console.log(`Fetching user details for user ID: ${bid.user_id}`)
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(bid.user_id)
+
+      if (userError) {
+        console.error(`Error fetching user with ID ${bid.user_id}: ${userError.message}`)
+        continue
+      }
+
+      if (!userData || !userData.user || !userData.user.email) {
+        console.error(`No email found for user with ID ${bid.user_id}`)
+        continue
+      }
+
+      const userEmail = userData.user.email
+      console.log(`Processing email to: ${userEmail}`)
+
+      // Prepare email content
+      const emailPromise = resend.emails.send({
+        from: 'Auction System <onboarding@resend.dev>',
+        to: userEmail,
+        subject: `Congratulations! You've won the auction: ${auction.title}`,
+        html: `
+          <h1>Congratulations!</h1>
+          <p>You are one of the winning bidders for the auction: <strong>${auction.title}</strong></p>
+          <p>Your winning bid amount: <strong>$${bid.amount}</strong></p>
+          <p>Please log in to your account to complete the payment process within 24 hours.</p>
+          <p>Thank you for participating!</p>
+        `
+      })
+        .then(result => {
+          console.log(`Email sent successfully to ${userEmail}, result: ${JSON.stringify(result)}`)
+          
+          // Create notification in database
+          return supabase
+            .from('notifications')
+            .insert({
+              user_id: bid.user_id,
+              type: 'winner',
+              message: `You've won the auction: ${auction.title} with a bid of $${bid.amount}`,
+              auction_id: auctionId
+            })
+            .then(({ error: notificationError }) => {
+              if (notificationError) {
+                console.error(`Error creating notification: ${notificationError.message}`)
+              } else {
+                console.log(`Notification created for user ${bid.user_id}`)
+              }
+              return { success: true, email: userEmail }
+            })
+        })
+        .catch(error => {
+          console.error(`Error sending email to ${userEmail}: ${error.message}`)
+          return { success: false, email: userEmail, error: error.message }
+        })
+
+      emailPromises.push(emailPromise)
+    }
+
+    // Wait for all emails to be sent
+    console.log(`Waiting for ${emailPromises.length} emails to be sent`)
+    const results = await Promise.all(emailPromises)
+    console.log(`Email sending results: ${JSON.stringify(results)}`)
+
+    // Count successful emails
+    successCount = results.filter(r => r.success).length
+    console.log(`Successfully sent ${successCount} emails`)
+
+    // Mark auction as processed
+    console.log(`Updating auction ${auctionId} as processed`)
+    const { error: updateError } = await supabase
+      .from('auctions')
       .update({ winners_processed: true })
-      .eq("id", auctionId);
+      .eq('id', auctionId)
+
+    if (updateError) {
+      console.error(`Error updating auction status: ${updateError.message}`)
+    } else {
+      console.log('Auction status updated successfully')
+    }
+
+    // Return success response
+    return new Response(
+      JSON.stringify({
+        message: `Sent ${successCount} winner emails`,
+        successCount,
+        results
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  } catch (error) {
+    console.error(`Unhandled exception: ${error.message}`)
+    console.error(error.stack)
     
     return new Response(
-      JSON.stringify({ 
-        message: "Winner emails processed", 
-        results: emailResults,
-        successCount: emailResults.filter(r => r.success).length,
-        failureCount: emailResults.filter(r => !r.success).length
+      JSON.stringify({
+        error: 'Internal server error',
+        message: error.message,
+        stack: error.stack
       }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    );
-  } catch (error) {
-    console.error("Error in send-winner-email function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
+    )
   }
-};
-
-serve(handler);
+})
