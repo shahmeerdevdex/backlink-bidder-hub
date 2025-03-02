@@ -18,7 +18,10 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
-  console.log('Received request to send-winner-email function')
+  console.log('⚡ [INVOKED] send-winner-email function started')
+  console.log('Resend API Key exists:', !!resendApiKey)
+  console.log('Supabase URL:', supabaseUrl)
+  console.log('Supabase Service Role Key exists:', !!supabaseKey)
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -32,7 +35,6 @@ Deno.serve(async (req) => {
     const { auctionId } = requestData
     
     console.log(`Processing auction ID: ${auctionId}`)
-    console.log(`Resend API Key exists: ${!!resendApiKey}`)
     
     if (!auctionId) {
       console.error('Missing required parameter: auctionId')
@@ -58,7 +60,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log(`Auction data retrieved: ${JSON.stringify(auction)}`)
+    console.log(`Auction data retrieved:`, auction)
     
     // Find winners (top bidders based on max_spots)
     console.log(`Fetching top bidders for auction with max_spots: ${auction.max_spots}`)
@@ -79,7 +81,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Found ${topBids?.length || 0} top bidders`)
-    console.log(`Top bids data: ${JSON.stringify(topBids)}`)
+    console.log(`Top bids data:`, topBids)
 
     if (!topBids || topBids.length === 0) {
       console.log('No eligible winners found')
@@ -125,7 +127,7 @@ Deno.serve(async (req) => {
         `
       })
         .then(result => {
-          console.log(`Email sent successfully to ${userEmail}, result: ${JSON.stringify(result)}`)
+          console.log(`Email sent successfully to ${userEmail}, result:`, result)
           
           // Create notification in database
           return supabase
@@ -156,7 +158,7 @@ Deno.serve(async (req) => {
     // Wait for all emails to be sent
     console.log(`Waiting for ${emailPromises.length} emails to be sent`)
     const results = await Promise.all(emailPromises)
-    console.log(`Email sending results: ${JSON.stringify(results)}`)
+    console.log(`Email sending results:`, results)
 
     // Count successful emails
     successCount = results.filter(r => r.success).length
