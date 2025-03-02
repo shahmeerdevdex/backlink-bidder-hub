@@ -48,6 +48,8 @@ export function Notifications() {
         return;
       }
 
+      console.log('Raw notifications data:', data);
+
       // Process the data to ensure it matches our Notification interface
       // This handles the type inconsistency and ensures auction_id is properly set
       const processedData: Notification[] = (data || []).map(item => ({
@@ -56,11 +58,13 @@ export function Notifications() {
         // Cast the type to our specific union type
         type: (item.type as 'winner' | 'outbid' | 'auction_ending' | 'new_auction'),
         message: item.message,
-        auction_id: item.auction_id || null,
+        // Add auction_id property even if it doesn't exist in the database
+        auction_id: (item as any).auction_id || null,
         read: !!item.read,
         created_at: item.created_at
       }));
       
+      console.log('Processed notifications data:', processedData);
       setNotifications(processedData);
       setUnreadCount(processedData.filter(n => !n.read).length || 0);
     };
@@ -84,7 +88,7 @@ export function Notifications() {
           
           // Show toast for new notifications
           if (payload.eventType === 'INSERT') {
-            const newNotification = payload.new as Notification;
+            const newNotification = payload.new as unknown as Notification;
             toast({
               title: getNotificationTitle(newNotification.type),
               description: newNotification.message,
