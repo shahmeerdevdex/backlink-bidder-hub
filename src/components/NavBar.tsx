@@ -10,6 +10,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
 import { LogOut, Home, ShoppingBag, User, Users } from 'lucide-react';
+import { Notifications } from '@/components/Notifications';
 
 export function NavBar() {
   const navigate = useNavigate();
@@ -75,6 +76,8 @@ export function NavBar() {
           </NavigationMenu>
 
           <div className="flex items-center gap-4">
+            {user && <Notifications />}
+            
             {user ? (
               <Button
                 variant="outline"
