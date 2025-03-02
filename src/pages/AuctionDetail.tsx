@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +38,7 @@ export default function AuctionDetail() {
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [topBidders, setTopBidders] = useState<Set<string>>(new Set());
+  const [emailsSent, setEmailsSent] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -164,6 +164,36 @@ export default function AuctionDetail() {
 
     return () => clearInterval(interval);
   }, [auction]);
+
+  useEffect(() => {
+    if (auction && new Date(auction.ends_at) <= new Date() && topBidders.size > 0 && !emailsSent) {
+      // Check if the auction has ended and we have top bidders
+      const sendWinnerEmails = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('send-winner-email', {
+            body: { auctionId: auction.id }
+          });
+
+          if (error) {
+            console.error('Error sending winner emails:', error);
+            return;
+          }
+
+          console.log('Winner emails sent:', data);
+          setEmailsSent(true);
+          
+          toast({
+            title: "Winner emails sent",
+            description: "Email notifications have been sent to auction winners"
+          });
+        } catch (error) {
+          console.error('Error invoking send-winner-email function:', error);
+        }
+      };
+
+      sendWinnerEmails();
+    }
+  }, [auction, topBidders, emailsSent, toast]);
 
   const handleBid = async () => {
     if (!auction || !currentUser) {

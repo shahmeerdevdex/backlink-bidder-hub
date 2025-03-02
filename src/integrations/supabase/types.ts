@@ -69,6 +69,7 @@ export type Database = {
           status: string | null
           title: string
           updated_at: string | null
+          winners_processed: boolean | null
         }
         Insert: {
           created_at?: string | null
@@ -84,6 +85,7 @@ export type Database = {
           status?: string | null
           title: string
           updated_at?: string | null
+          winners_processed?: boolean | null
         }
         Update: {
           created_at?: string | null
@@ -99,6 +101,7 @@ export type Database = {
           status?: string | null
           title?: string
           updated_at?: string | null
+          winners_processed?: boolean | null
         }
         Relationships: []
       }

@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Clock, Users } from 'lucide-react';
+import { Clock, Users, Mail } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
@@ -38,9 +38,27 @@ export function AuctionCard({
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [currentPrice, setCurrentPrice] = useState(initialCurrentPrice);
   const [filledSpots, setFilledSpots] = useState(initialFilledSpots);
+  const [hasWinnerNotification, setHasWinnerNotification] = useState(false);
   const { toast } = useToast();
   const isFullyBooked = filledSpots >= maxSpots;
   const isExpired = new Date(endsAt) <= new Date();
+
+  useEffect(() => {
+    // Check if winner notifications have been sent
+    const checkWinnerNotifications = async () => {
+      if (isExpired) {
+        const { data: winners } = await supabase
+          .from('auction_winners')
+          .select('id')
+          .eq('auction_id', id)
+          .limit(1);
+        
+        setHasWinnerNotification(winners && winners.length > 0);
+      }
+    };
+    
+    checkWinnerNotifications();
+  }, [id, isExpired]);
 
   useEffect(() => {
     // Subscribe to auction updates
@@ -136,6 +154,12 @@ export function AuctionCard({
             <span className={`text-sm ${isExpired ? "text-red-500 font-semibold" : ""}`}>
               {timeLeft}
             </span>
+            {hasWinnerNotification && isExpired && (
+              <Badge variant="outline" className="ml-2 bg-green-50">
+                <Mail className="w-3 h-3 mr-1" />
+                Winners Notified
+              </Badge>
+            )}
           </div>
         </div>
       </CardContent>
