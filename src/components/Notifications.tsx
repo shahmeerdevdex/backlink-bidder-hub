@@ -48,10 +48,17 @@ export function Notifications() {
         return;
       }
 
-      // Make sure all required fields are present, providing defaults if needed
-      const processedData = (data || []).map(item => ({
-        ...item,
-        auction_id: item.auction_id || null
+      // Process the data to ensure it matches our Notification interface
+      // This handles the type inconsistency and ensures auction_id is properly set
+      const processedData: Notification[] = (data || []).map(item => ({
+        id: item.id,
+        user_id: item.user_id,
+        // Cast the type to our specific union type
+        type: (item.type as 'winner' | 'outbid' | 'auction_ending' | 'new_auction'),
+        message: item.message,
+        auction_id: item.auction_id || null,
+        read: !!item.read,
+        created_at: item.created_at
       }));
       
       setNotifications(processedData);
