@@ -334,7 +334,7 @@ export default function AuctionDetail() {
               </Badge>
               
               {new Date(auction.ends_at) <= new Date() && (
-                <Badge variant={emailsSent ? "success" : "outline"}>
+                <Badge variant={emailsSent ? "default" : "outline"}>
                   {emailsSent ? "Emails sent" : "Emails pending"}
                 </Badge>
               )}

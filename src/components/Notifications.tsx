@@ -19,7 +19,7 @@ interface Notification {
   user_id: string;
   type: 'winner' | 'outbid' | 'auction_ending' | 'new_auction';
   message: string;
-  auction_id: string;
+  auction_id: string | null;
   read: boolean;
   created_at: string;
 }
@@ -48,8 +48,14 @@ export function Notifications() {
         return;
       }
 
-      setNotifications(data || []);
-      setUnreadCount(data?.filter(n => !n.read).length || 0);
+      // Make sure all required fields are present, providing defaults if needed
+      const processedData = (data || []).map(item => ({
+        ...item,
+        auction_id: item.auction_id || null
+      }));
+      
+      setNotifications(processedData);
+      setUnreadCount(processedData.filter(n => !n.read).length || 0);
     };
 
     fetchNotifications();
@@ -122,7 +128,7 @@ export function Notifications() {
       setUnreadCount(prev => Math.max(0, prev - 1));
     }
 
-    // Navigate to the relevant auction
+    // Navigate to the relevant auction if auction_id exists
     if (notification.auction_id) {
       setOpen(false);
       navigate(`/auctions/${notification.auction_id}`);
