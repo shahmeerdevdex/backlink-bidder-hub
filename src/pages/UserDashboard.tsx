@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -116,7 +115,6 @@ export default function UserDashboard() {
       if (error) throw error;
       setNotifications(data || []);
       
-      // Show unread notifications as toasts
       data?.filter(n => !n.read).forEach(notification => {
         toast({
           title: notification.type === 'winner' ? 'Auction Won!' : 'Notification',
@@ -124,7 +122,6 @@ export default function UserDashboard() {
         });
       });
       
-      // Mark notifications as read
       if (data && data.length > 0) {
         const unreadIds = data.filter(n => !n.read).map(n => n.id);
         if (unreadIds.length > 0) {
@@ -142,7 +139,6 @@ export default function UserDashboard() {
   const fetchUserData = async () => {
     setIsLoading(true);
     try {
-      // Fetch active bids
       const { data: bidsData, error: bidsError } = await supabase
         .from('bids')
         .select(`
@@ -168,7 +164,6 @@ export default function UserDashboard() {
       if (bidsError) throw bidsError;
       setActiveBids(bidsData || []);
 
-      // Fetch auctions where user is a winner
       const { data: wonData, error: wonError } = await supabase
         .from('auction_winners')
         .select(`
@@ -194,9 +189,32 @@ export default function UserDashboard() {
         .order('created_at', { ascending: false });
 
       if (wonError) throw wonError;
-      setWonAuctions(wonData || []);
+      
+      const wonAuctionIds = (wonData || []).map(won => won.auction.id);
+      const { data: winnerNotifications, error: notifError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user?.id)
+        .eq('type', 'winner')
+        .in('auction_id', wonAuctionIds.length > 0 ? wonAuctionIds : ['none']);
+        
+      if (notifError) {
+        console.error('Error fetching winner notifications:', notifError);
+      }
+      
+      const processedWonData = (wonData || []).map(auction => {
+        const hasEmailNotification = winnerNotifications?.some(
+          notification => notification.auction_id === auction.auction.id
+        );
+        
+        return {
+          ...auction,
+          email_sent: hasEmailNotification || false
+        };
+      });
+      
+      setWonAuctions(processedWonData || []);
 
-      // Fetch all auctions the user has participated in that have ended
       const { data: userBids, error: userBidsError } = await supabase
         .from('bids')
         .select('auction_id')
@@ -205,7 +223,6 @@ export default function UserDashboard() {
       
       if (userBidsError) throw userBidsError;
       
-      // Get unique auction IDs
       const userAuctionIds = [...new Set((userBids || []).map(bid => bid.auction_id))];
       
       if (userAuctionIds.length === 0) {
@@ -214,7 +231,6 @@ export default function UserDashboard() {
         return;
       }
 
-      // Fetch completed auctions that the user has participated in
       const { data: completed, error: completedError } = await supabase
         .from('auctions')
         .select('*')
@@ -226,9 +242,7 @@ export default function UserDashboard() {
 
       console.log('Completed auctions:', completed);
 
-      // For each completed auction, get the winners
       const completedWithWinners = await Promise.all((completed || []).map(async (auction) => {
-        // Fetch winners for this auction
         const { data: winners, error: winnersError } = await supabase
           .from('auction_winners')
           .select(`
@@ -242,9 +256,7 @@ export default function UserDashboard() {
           return null;
         }
 
-        // Get usernames for each winner
         const winnersWithUsernames = await Promise.all((winners || []).map(async (winner: AuctionWinner) => {
-          // Get the profile data for each winner
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('username')
@@ -268,17 +280,13 @@ export default function UserDashboard() {
 
       setCompletedAuctions(completedWithWinners.filter(Boolean) as CompletedAuction[]);
       
-      // Check if user has won any auctions but no entry in auction_winners yet
-      // This can happen if the process_auction_winners function hasn't run
       const endedAuctions = completed?.filter(auction => {
-        // Check if this auction has already been processed (has winners)
         const hasWinners = wonData?.some(won => won.auction.id === auction.id);
         return !hasWinners && new Date(auction.ends_at) < new Date();
       }) || [];
       
       if (endedAuctions.length > 0) {
         for (const auction of endedAuctions) {
-          // Get top bidders for this auction
           const { data: topBids, error: topBidsError } = await supabase
             .from('bids')
             .select('id, user_id, amount')
@@ -292,14 +300,12 @@ export default function UserDashboard() {
             continue;
           }
           
-          // Check if user is in top spots
           const userBid = topBids?.find(bid => bid.user_id === user?.id);
           if (userBid) {
-            // Create a temporary "won auction" entry
             const tempWonAuction: WonAuction = {
               id: `temp_${auction.id}`,
               status: 'pending_processing',
-              payment_deadline: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+              payment_deadline: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString(),
               auction: {
                 id: auction.id,
                 title: auction.title,
@@ -312,7 +318,6 @@ export default function UserDashboard() {
               }
             };
             
-            // Add to won auctions if not already there
             setWonAuctions(prev => {
               if (!prev.some(won => won.auction.id === auction.id)) {
                 return [...prev, tempWonAuction];
@@ -498,7 +503,7 @@ export default function UserDashboard() {
                           >
                             View Auction
                           </Button>
-                          {won.status === 'pending_payment' && (
+                          {(won.status === 'pending_payment' || won.email_sent) && (
                             <Button
                               size="sm"
                               onClick={() => handlePayment(won.winning_bid.id)}
