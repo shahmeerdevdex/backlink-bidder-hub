@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -198,8 +197,8 @@ export default function UserDashboard() {
       
       const wonAuctionIds = wonData ? wonData.map(won => won.auction.id) : [];
       
-      // Here's the corrected type declaration
       const winnerNotifications: Notification[] = [];
+      
       if (wonAuctionIds.length > 0) {
         const { data: notifData, error: notifError } = await supabase
           .from('notifications')
@@ -210,11 +209,9 @@ export default function UserDashboard() {
           
         if (notifError) {
           console.error('Error fetching winner notifications:', notifError);
-        } else {
-          // Correctly assign the typed data
-          const typedNotifs = notifData as Notification[] || [];
-          typedNotifs.forEach(notif => {
-            winnerNotifications.push(notif);
+        } else if (notifData) {
+          notifData.forEach(notif => {
+            winnerNotifications.push(notif as Notification);
           });
         }
       }
@@ -226,7 +223,7 @@ export default function UserDashboard() {
         
         return {
           ...auction,
-          email_sent: hasEmailNotification || false
+          email_sent: hasEmailNotification
         };
       });
       
@@ -519,7 +516,8 @@ export default function UserDashboard() {
                           >
                             View Auction
                           </Button>
-                          {(won.status === 'pending_payment' || won.email_sent) && (
+                          {(won.status === 'pending_payment' || won.email_sent) && 
+                            won.status !== 'paid' && (
                             <Button
                               size="sm"
                               onClick={() => handlePayment(won.winning_bid.id)}
