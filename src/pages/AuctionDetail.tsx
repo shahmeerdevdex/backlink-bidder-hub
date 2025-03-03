@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, Clock, CreditCard, Users, X, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, CreditCard, DollarSign, Users, X, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -19,6 +20,7 @@ interface Auction {
   max_spots: number;
   filled_spots: number;
   ends_at: string;
+  winners_processed: boolean;
 }
 
 interface Bid {
@@ -50,6 +52,7 @@ export default function AuctionDetail() {
   const [emailsSent, setEmailsSent] = useState<boolean>(false);
   const [isSendingEmails, setIsSendingEmails] = useState<boolean>(false);
   const [userWinner, setUserWinner] = useState<AuctionWinner | null>(null);
+  const [isAuctionEnded, setIsAuctionEnded] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -92,6 +95,10 @@ export default function AuctionDetail() {
 
       setAuction(data);
       setEmailsSent(data.winners_processed || false);
+      
+      // Check if auction has ended
+      const endTime = new Date(data.ends_at);
+      setIsAuctionEnded(endTime <= new Date());
     };
 
     const fetchBids = async () => {
@@ -188,10 +195,14 @@ export default function AuctionDetail() {
 
     const updateTimeLeft = () => {
       const end = new Date(auction.ends_at);
-      if (end > new Date()) {
+      const now = new Date();
+      
+      if (end > now) {
         setTimeLeft(formatDistanceToNow(end, { addSuffix: true }));
+        setIsAuctionEnded(false);
       } else {
         setTimeLeft('Ended');
+        setIsAuctionEnded(true);
       }
     };
 
@@ -352,19 +363,40 @@ export default function AuctionDetail() {
   };
 
   const handlePayment = async () => {
-    if (!userWinner) return;
+    if (!userWinner && !auction) return;
     
-    const winningBid = userWinner.winning_bid_id;
-    navigate(`/payment/${winningBid}`);
+    let bidId;
+    
+    if (userWinner && userWinner.winning_bid_id) {
+      bidId = userWinner.winning_bid_id;
+    } else {
+      // If no specific winning bid is recorded, find user's highest bid
+      const userBids = bids.filter(bid => bid.user_id === currentUser && bid.status === 'active')
+                          .sort((a, b) => b.amount - a.amount);
+      
+      if (userBids.length > 0) {
+        bidId = userBids[0].id;
+      } else {
+        toast({
+          title: "No eligible bid found",
+          description: "Could not find a valid bid for payment",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    navigate(`/payment/${bidId}`);
   };
 
   if (!auction) {
     return <div className="container mx-auto px-4 py-8">Loading...</div>;
   }
 
-  const isAuctionEnded = new Date(auction.ends_at) <= new Date();
-  const isUserEligibleToPay = userWinner && (userWinner.status === 'pending_payment');
-
+  const isUserEligibleToPay = userWinner && 
+    (userWinner.status === 'pending_payment' || 
+     (isAuctionEnded && topBidders.has(currentUser || '')));
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <Card className="mb-8">
@@ -406,7 +438,7 @@ export default function AuctionDetail() {
                 onClick={handlePayment}
                 className="bg-green-600 hover:bg-green-700"
               >
-                <CreditCard className="w-4 h-4 mr-2" />
+                <DollarSign className="w-4 h-4 mr-2" />
                 Pay Now
               </Button>
             </div>
