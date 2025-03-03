@@ -47,6 +47,7 @@ interface WonAuction {
   id: string;
   status: string;
   payment_deadline: string;
+  email_sent?: boolean;
   auction: {
     id: string;
     title: string;
@@ -83,6 +84,8 @@ interface Notification {
   message: string;
   read: boolean;
   created_at: string;
+  auction_id?: string;
+  user_id: string;
 }
 
 export default function UserDashboard() {
@@ -113,17 +116,19 @@ export default function UserDashboard() {
         .limit(10);
         
       if (error) throw error;
-      setNotifications(data || []);
       
-      data?.filter(n => !n.read).forEach(notification => {
+      const typedData = (data || []) as Notification[];
+      setNotifications(typedData);
+      
+      typedData.filter(n => !n.read).forEach(notification => {
         toast({
           title: notification.type === 'winner' ? 'Auction Won!' : 'Notification',
           description: notification.message,
         });
       });
       
-      if (data && data.length > 0) {
-        const unreadIds = data.filter(n => !n.read).map(n => n.id);
+      if (typedData && typedData.length > 0) {
+        const unreadIds = typedData.filter(n => !n.read).map(n => n.id);
         if (unreadIds.length > 0) {
           await supabase
             .from('notifications')
@@ -190,20 +195,26 @@ export default function UserDashboard() {
 
       if (wonError) throw wonError;
       
-      const wonAuctionIds = (wonData || []).map(won => won.auction.id);
-      const { data: winnerNotifications, error: notifError } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('type', 'winner')
-        .in('auction_id', wonAuctionIds.length > 0 ? wonAuctionIds : ['none']);
-        
-      if (notifError) {
-        console.error('Error fetching winner notifications:', notifError);
+      const wonAuctionIds = wonData ? wonData.map(won => won.auction.id) : [];
+      
+      let winnerNotifications: any[] = [];
+      if (wonAuctionIds.length > 0) {
+        const { data: notifData, error: notifError } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user?.id)
+          .eq('type', 'winner')
+          .in('auction_id', wonAuctionIds);
+          
+        if (notifError) {
+          console.error('Error fetching winner notifications:', notifError);
+        } else {
+          winnerNotifications = notifData || [];
+        }
       }
       
       const processedWonData = (wonData || []).map(auction => {
-        const hasEmailNotification = winnerNotifications?.some(
+        const hasEmailNotification = winnerNotifications.some(
           notification => notification.auction_id === auction.auction.id
         );
         
@@ -213,7 +224,7 @@ export default function UserDashboard() {
         };
       });
       
-      setWonAuctions(processedWonData || []);
+      setWonAuctions(processedWonData);
 
       const { data: userBids, error: userBidsError } = await supabase
         .from('bids')
@@ -315,7 +326,8 @@ export default function UserDashboard() {
                 id: userBid.id,
                 amount: userBid.amount,
                 payments: []
-              }
+              },
+              email_sent: false
             };
             
             setWonAuctions(prev => {
