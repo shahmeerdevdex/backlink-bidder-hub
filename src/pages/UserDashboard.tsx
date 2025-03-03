@@ -197,7 +197,7 @@ export default function UserDashboard() {
       
       const wonAuctionIds = wonData ? wonData.map(won => won.auction.id) : [];
       
-      let winnerNotifications: any[] = [];
+      let winnerNotifications: { auction_id?: string }[] = [];
       if (wonAuctionIds.length > 0) {
         const { data: notifData, error: notifError } = await supabase
           .from('notifications')
@@ -250,8 +250,6 @@ export default function UserDashboard() {
         .order('ends_at', { ascending: false });
 
       if (completedError) throw completedError;
-
-      console.log('Completed auctions:', completed);
 
       const completedWithWinners = await Promise.all((completed || []).map(async (auction) => {
         const { data: winners, error: winnersError } = await supabase
