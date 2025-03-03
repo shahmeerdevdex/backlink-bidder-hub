@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, Clock, Users, X, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, CreditCard, Users, X, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/components/AuthProvider';
 
 interface Auction {
   id: string;
@@ -28,6 +29,13 @@ interface Bid {
   status: string;
 }
 
+interface AuctionWinner {
+  id: string;
+  user_id: string;
+  status: string;
+  winning_bid_id: string;
+}
+
 export default function AuctionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -36,10 +44,12 @@ export default function AuctionDetail() {
   const [bidAmount, setBidAmount] = useState<string>('');
   const [timeLeft, setTimeLeft] = useState<string>('');
   const { toast } = useToast();
+  const { user } = useAuth();
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [topBidders, setTopBidders] = useState<Set<string>>(new Set());
   const [emailsSent, setEmailsSent] = useState<boolean>(false);
   const [isSendingEmails, setIsSendingEmails] = useState<boolean>(false);
+  const [userWinner, setUserWinner] = useState<AuctionWinner | null>(null);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -99,8 +109,32 @@ export default function AuctionDetail() {
       setBids(data || []);
     };
 
+    const fetchUserWinnerStatus = async () => {
+      if (!user || !id) return;
+      
+      const { data, error } = await supabase
+        .from('auction_winners')
+        .select('*')
+        .eq('auction_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error fetching winner status:', error);
+        return;
+      }
+      
+      if (data) {
+        console.log('User is a winner for this auction:', data);
+        setUserWinner(data);
+      }
+    };
+
     fetchAuction();
     fetchBids();
+    if (user) {
+      fetchUserWinnerStatus();
+    }
 
     const auctionChannel = supabase
       .channel('auction-detail-updates')
@@ -147,7 +181,7 @@ export default function AuctionDetail() {
       supabase.removeChannel(auctionChannel);
       supabase.removeChannel(bidsChannel);
     };
-  }, [id]);
+  }, [id, user]);
 
   useEffect(() => {
     if (!auction) return;
@@ -317,9 +351,19 @@ export default function AuctionDetail() {
     });
   };
 
+  const handlePayment = async () => {
+    if (!userWinner) return;
+    
+    const winningBid = userWinner.winning_bid_id;
+    navigate(`/payment/${winningBid}`);
+  };
+
   if (!auction) {
     return <div className="container mx-auto px-4 py-8">Loading...</div>;
   }
+
+  const isAuctionEnded = new Date(auction.ends_at) <= new Date();
+  const isUserEligibleToPay = userWinner && (userWinner.status === 'pending_payment');
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -333,9 +377,15 @@ export default function AuctionDetail() {
                 {auction.filled_spots}/{auction.max_spots} spots
               </Badge>
               
-              {new Date(auction.ends_at) <= new Date() && (
+              {isAuctionEnded && (
                 <Badge variant={emailsSent ? "default" : "outline"}>
                   {emailsSent ? "Emails sent" : "Emails pending"}
+                </Badge>
+              )}
+              
+              {isUserEligibleToPay && (
+                <Badge variant="default" className="bg-green-500">
+                  You won this auction!
                 </Badge>
               )}
             </div>
@@ -347,6 +397,20 @@ export default function AuctionDetail() {
         </CardHeader>
         <CardContent>
           <p className="text-lg mb-6">{auction.description}</p>
+
+          {isUserEligibleToPay && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="text-xl font-semibold text-green-700 mb-2">Congratulations on winning this auction!</h3>
+              <p className="mb-4">Please complete your payment to claim your winnings.</p>
+              <Button 
+                onClick={handlePayment}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                Pay Now
+              </Button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
@@ -362,23 +426,25 @@ export default function AuctionDetail() {
                 </div>
               </div>
 
-              <div className="pt-4">
-                <div className="flex gap-4">
-                  <Input
-                    type="number"
-                    placeholder="Enter bid amount"
-                    value={bidAmount}
-                    onChange={(e) => setBidAmount(e.target.value)}
-                    min={auction.current_price + 1}
-                  />
-                  <Button 
-                    onClick={handleBid}
-                    disabled={auction.filled_spots >= auction.max_spots || !currentUser}
-                  >
-                    Place Bid
-                  </Button>
+              {!isAuctionEnded && (
+                <div className="pt-4">
+                  <div className="flex gap-4">
+                    <Input
+                      type="number"
+                      placeholder="Enter bid amount"
+                      value={bidAmount}
+                      onChange={(e) => setBidAmount(e.target.value)}
+                      min={auction.current_price + 1}
+                    />
+                    <Button 
+                      onClick={handleBid}
+                      disabled={auction.filled_spots >= auction.max_spots || !currentUser}
+                    >
+                      Place Bid
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div>
@@ -406,7 +472,7 @@ export default function AuctionDetail() {
                         <span className="text-sm text-muted-foreground">
                           {formatDistanceToNow(new Date(bid.created_at), { addSuffix: true })}
                         </span>
-                        {bid.user_id === currentUser && bid.status === 'active' && (
+                        {bid.user_id === currentUser && bid.status === 'active' && !isAuctionEnded && (
                           <Button
                             variant="ghost"
                             size="icon"

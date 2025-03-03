@@ -197,7 +197,7 @@ export default function UserDashboard() {
       
       const wonAuctionIds = wonData ? wonData.map(won => won.auction.id) : [];
       
-      const winnerNotifications: Notification[] = [];
+      let winnerNotificationsMap: Record<string, boolean> = {};
       
       if (wonAuctionIds.length > 0) {
         const { data: notifData, error: notifError } = await supabase
@@ -211,22 +211,21 @@ export default function UserDashboard() {
           console.error('Error fetching winner notifications:', notifError);
         } else if (notifData) {
           notifData.forEach(notif => {
-            winnerNotifications.push(notif as Notification);
+            if (notif.auction_id) {
+              winnerNotificationsMap[notif.auction_id] = true;
+            }
           });
         }
       }
       
       const processedWonData = (wonData || []).map(auction => {
-        const hasEmailNotification = winnerNotifications.some(
-          notification => notification.auction_id === auction.auction.id
-        );
-        
         return {
           ...auction,
-          email_sent: hasEmailNotification
+          email_sent: winnerNotificationsMap[auction.auction.id] || false
         };
       });
       
+      console.log('Won auctions with email status:', processedWonData);
       setWonAuctions(processedWonData);
 
       const { data: userBids, error: userBidsError } = await supabase
@@ -396,6 +395,7 @@ export default function UserDashboard() {
   };
 
   const handlePayment = (bidId: string) => {
+    console.log('Initiating payment for bid:', bidId);
     navigate(`/payment/${bidId}`);
   };
 
@@ -497,7 +497,9 @@ export default function UserDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {wonAuctions.map((won) => (
+                  {wonAuctions.map((won) => {
+                    console.log('Won auction row:', won.id, 'Status:', won.status, 'Email sent:', won.email_sent);
+                    return (
                     <TableRow key={won.id}>
                       <TableCell>{won.auction.title}</TableCell>
                       <TableCell>${won.winning_bid.amount}</TableCell>
@@ -516,8 +518,8 @@ export default function UserDashboard() {
                           >
                             View Auction
                           </Button>
-                          {(won.status === 'pending_payment' || won.email_sent) && 
-                            won.status !== 'paid' && (
+                          {(won.status === 'pending_payment' || won.email_sent === true) && 
+                           won.status !== 'paid' && (
                             <Button
                               size="sm"
                               onClick={() => handlePayment(won.winning_bid.id)}
@@ -528,7 +530,7 @@ export default function UserDashboard() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                   {wonAuctions.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center">
