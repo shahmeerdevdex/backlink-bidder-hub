@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -197,7 +198,8 @@ export default function UserDashboard() {
       
       const wonAuctionIds = wonData ? wonData.map(won => won.auction.id) : [];
       
-      let winnerNotifications: { auction_id?: string }[] = [];
+      // Here's the corrected type declaration
+      const winnerNotifications: Notification[] = [];
       if (wonAuctionIds.length > 0) {
         const { data: notifData, error: notifError } = await supabase
           .from('notifications')
@@ -209,7 +211,11 @@ export default function UserDashboard() {
         if (notifError) {
           console.error('Error fetching winner notifications:', notifError);
         } else {
-          winnerNotifications = notifData || [];
+          // Correctly assign the typed data
+          const typedNotifs = notifData as Notification[] || [];
+          typedNotifs.forEach(notif => {
+            winnerNotifications.push(notif);
+          });
         }
       }
       
