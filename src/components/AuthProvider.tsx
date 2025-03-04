@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  isEmailVerified: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isAdmin: false,
+  isEmailVerified: false,
   signOut: async () => {}
 });
 
@@ -22,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -29,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
+        setIsEmailVerified(!!session.user.email_confirmed_at);
         checkAdminStatus(session.user.id);
       }
       setLoading(false);
@@ -41,9 +45,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       handleAuthChange(event, session?.user);
       setUser(session?.user ?? null);
       if (session?.user) {
+        setIsEmailVerified(!!session.user.email_confirmed_at);
         checkAdminStatus(session.user.id);
       } else {
         setIsAdmin(false);
+        setIsEmailVerified(false);
       }
       setLoading(false);
     });
@@ -64,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast({
           title: "Email Not Verified",
           description: "Please check your email to verify your account.",
-          variant: "destructive", // Changed from "warning" to "destructive"
+          variant: "destructive",
         });
       } else if (user) {
         toast({
@@ -103,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isEmailVerified, signOut }}>
       {children}
     </AuthContext.Provider>
   );
