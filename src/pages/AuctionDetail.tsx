@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,7 +63,6 @@ export default function AuctionDetail() {
 
   useEffect(() => {
     const updateTopBidders = () => {
-      // Get only the highest bid from each user
       const userHighestBids = new Map<string, Bid>();
       
       bids.filter(bid => bid.status === 'active').forEach(bid => {
@@ -74,11 +72,9 @@ export default function AuctionDetail() {
         }
       });
       
-      // Sort the highest bids by amount in descending order
       const highestBids = Array.from(userHighestBids.values())
         .sort((a, b) => b.amount - a.amount);
       
-      // Take the top N bidders based on auction max_spots
       const uniqueBidders = new Set<string>();
       for (const bid of highestBids) {
         if (uniqueBidders.size < (auction?.max_spots || 3)) {
@@ -340,12 +336,20 @@ export default function AuctionDetail() {
 
       // Send email notifications to all bidders
       try {
-        const { error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
+        console.log('Invoking bid-notification-email function with bid ID:', data.id);
+        const { data: notificationData, error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
           body: { bidId: data.id }
         });
 
         if (notificationError) {
           console.error('Error sending bid notifications:', notificationError);
+          toast({
+            title: "Warning",
+            description: "Bid placed but there was an issue sending notifications",
+            variant: "warning",
+          });
+        } else {
+          console.log('Notification response:', notificationData);
         }
       } catch (notificationError) {
         console.error('Failed to invoke bid notification function:', notificationError);
@@ -422,7 +426,6 @@ export default function AuctionDetail() {
     (userWinner.status === 'pending_payment' || 
      (isAuctionEnded && topBidders.has(currentUser || '')));
   
-  // Get only the highest bid for the current user
   const userHighestBid = currentUser ? 
     bids.filter(bid => bid.user_id === currentUser && bid.status === 'active')
         .sort((a, b) => b.amount - a.amount)[0] : null;
@@ -601,7 +604,6 @@ export default function AuctionDetail() {
                   const isUserInTopSpots = topBidders.has(bid.user_id);
                   const isCurrentUserBid = bid.user_id === currentUser;
                   
-                  // Determine if this is the user's highest bid
                   const isUsersHighestBid = isCurrentUserBid && 
                     (!userHighestBid || bid.amount >= userHighestBid.amount);
                   
