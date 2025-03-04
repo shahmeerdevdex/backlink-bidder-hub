@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -86,39 +85,86 @@ export default function AuctionManagement() {
       creator_id: user.id,
     };
 
-    const { error } = editingAuction 
-      ? await supabase
-          .from('auctions')
-          .update(auctionData)
-          .eq('id', editingAuction.id)
-      : await supabase
-          .from('auctions')
-          .insert([auctionData]);
+    try {
+      const operation = editingAuction ? 'update' : 'insert';
+      const { data, error } = editingAuction 
+        ? await supabase
+            .from('auctions')
+            .update(auctionData)
+            .eq('id', editingAuction.id)
+            .select()
+        : await supabase
+            .from('auctions')
+            .insert([auctionData])
+            .select();
 
-    if (error) {
+      if (error) {
+        toast({
+          title: "Error saving auction",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const auctionId = data && data[0] ? data[0].id : (editingAuction ? editingAuction.id : null);
+      
+      if (auctionId && !editingAuction) {
+        try {
+          console.log('New auction created. Invoking bid-notification-email for auction ID:', auctionId);
+          
+          const { data: bidData, error: bidError } = await supabase
+            .from('bids')
+            .insert([{
+              auction_id: auctionId,
+              user_id: user.id,
+              amount: parseInt(form.starting_price),
+              status: 'active',
+              is_initial: true
+            }])
+            .select();
+            
+          if (bidError) {
+            console.error('Error creating initial bid:', bidError);
+          } else if (bidData && bidData[0]) {
+            const { data: notificationData, error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
+              body: { bidId: bidData[0].id }
+            });
+
+            if (notificationError) {
+              console.error('Error sending auction creation notifications:', notificationError);
+            } else {
+              console.log('Auction creation notification response:', notificationData);
+            }
+          }
+        } catch (notificationError) {
+          console.error('Failed to invoke bid notification function for new auction:', notificationError);
+        }
+      }
+
       toast({
-        title: "Error saving auction",
-        description: error.message,
+        title: editingAuction ? "Auction updated" : "Auction created",
+        description: editingAuction ? "Your auction has been updated successfully." : "Your new auction has been created successfully.",
+      });
+
+      setForm({
+        title: '',
+        description: '',
+        starting_price: '',
+        max_spots: '',
+        ends_at: '',
+      });
+      setIsCreating(false);
+      setEditingAuction(null);
+      fetchMyAuctions();
+    } catch (err) {
+      console.error("Error in handleSubmit:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
-      return;
     }
-
-    toast({
-      title: editingAuction ? "Auction updated" : "Auction created",
-      description: editingAuction ? "Your auction has been updated successfully." : "Your new auction has been created successfully.",
-    });
-
-    setForm({
-      title: '',
-      description: '',
-      starting_price: '',
-      max_spots: '',
-      ends_at: '',
-    });
-    setIsCreating(false);
-    setEditingAuction(null);
-    fetchMyAuctions();
   };
 
   const handleDelete = async (auctionId: string) => {

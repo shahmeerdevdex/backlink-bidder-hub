@@ -19,6 +19,8 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   console.log('⚡ [INVOKED] bid-notification-email function started')
+  console.log('Request method:', req.method)
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()))
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -28,7 +30,10 @@ Deno.serve(async (req) => {
 
   try {
     // Parse the request body
-    const requestData = await req.json()
+    const requestText = await req.text()
+    console.log('Raw request body:', requestText)
+    
+    const requestData = JSON.parse(requestText)
     const { bidId } = requestData
     
     console.log(`Processing notification for bid ID: ${bidId}`)
@@ -45,7 +50,7 @@ Deno.serve(async (req) => {
     console.log(`Fetching bid details for ID: ${bidId}`)
     const { data: bid, error: bidError } = await supabase
       .from('bids')
-      .select('id, amount, auction_id, user_id')
+      .select('id, amount, auction_id, user_id, is_initial')
       .eq('id', bidId)
       .single()
 
@@ -92,7 +97,52 @@ Deno.serve(async (req) => {
     const bidderEmail = bidderData.user?.email || 'Unknown bidder'
     console.log(`Bidder email: ${bidderEmail}`)
 
-    // Get all unique bidders for this auction (except the current bidder)
+    // If this is an initial bid (from auction creation), notify auction creator only
+    if (bid.is_initial) {
+      console.log('This is an initial bid from auction creation, notifying only the creator')
+      
+      // Send email to the auction creator
+      try {
+        const emailResult = await resend.emails.send({
+          from: 'Auction System <onboarding@resend.dev>',
+          to: bidderEmail,
+          subject: `Your auction "${auction.title}" has been created`,
+          html: `
+            <h1>Your Auction Has Been Created!</h1>
+            <p>Your auction "<strong>${auction.title}</strong>" has been successfully created.</p>
+            <p>Auction details:</p>
+            <ul>
+              <li>Description: ${auction.description}</li>
+              <li>Starting price: $${auction.starting_price}</li>
+              <li>Maximum spots: ${auction.max_spots}</li>
+            </ul>
+            <p>You will receive notifications when users place bids on your auction.</p>
+            <p>Thank you for using our auction system!</p>
+          `
+        });
+
+        console.log(`Email sent to creator (${bidderEmail}):`, emailResult);
+      
+        return new Response(
+          JSON.stringify({
+            message: `Auction creation email sent to ${bidderEmail}`,
+            success: true
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      } catch (error) {
+        console.error(`Error sending email to creator: ${error.message}`);
+        return new Response(
+          JSON.stringify({ error: `Error sending email to creator: ${error.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // For regular bids, get all unique bidders for this auction (except the current bidder)
     console.log(`Fetching all bidders for auction ID: ${bid.auction_id}`)
     const { data: uniqueBidders, error: biddersError } = await supabase
       .from('bids')

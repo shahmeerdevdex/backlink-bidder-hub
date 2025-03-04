@@ -346,7 +346,7 @@ export default function AuctionDetail() {
           toast({
             title: "Warning",
             description: "Bid placed but there was an issue sending notifications",
-            variant: "warning",
+            variant: "destructive",
           });
         } else {
           console.log('Notification response:', notificationData);
@@ -554,7 +554,7 @@ export default function AuctionDetail() {
                 />
                 <Button 
                   onClick={handleBid}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={auction.filled_spots >= auction.max_spots || !currentUser}
                 >
                   Place Bid
                 </Button>
