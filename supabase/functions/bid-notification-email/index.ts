@@ -38,9 +38,9 @@ Deno.serve(async (req) => {
     console.log('Raw request body:', requestText)
     
     const requestData = JSON.parse(requestText)
-    let { bidId, auctionId, notifyAllUsers } = requestData
+    let { bidId, auctionId, notifyAllUsers, outbidUserId } = requestData
     
-    console.log(`Processing notification with: bidId: ${bidId}, auctionId: ${auctionId}, notifyAllUsers: ${notifyAllUsers}`)
+    console.log(`Processing notification with: bidId: ${bidId}, auctionId: ${auctionId}, notifyAllUsers: ${notifyAllUsers}, outbidUserId: ${outbidUserId}`)
     
     if (!bidId && !auctionId) {
       console.error('Missing required parameters: either bidId or auctionId must be provided')
@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
     let auction;
     let bidder;
     let bidderEmail;
+    let newBidAmount;
 
     // If we have a bid ID, get bid and auction details from it
     if (bidId) {
@@ -72,6 +73,7 @@ Deno.serve(async (req) => {
       }
 
       console.log(`Bid data retrieved:`, bid)
+      newBidAmount = bid.amount;
       
       // Get auction details
       console.log(`Fetching auction details for ID: ${bid.auction_id}`)
@@ -132,6 +134,7 @@ Deno.serve(async (req) => {
 
       console.log(`Auction data retrieved:`, auctionData)
       auction = auctionData;
+      newBidAmount = auction.current_price;
 
       // Get creator details
       console.log(`Fetching creator details for ID: ${auction.creator_id}`)
@@ -151,6 +154,154 @@ Deno.serve(async (req) => {
       
       // For direct auction notification, always notify all users
       notifyAllUsers = true;
+    }
+
+    // Handle outbid notification specifically if outbidUserId is provided
+    if (outbidUserId) {
+      console.log(`Processing outbid notification for user: ${outbidUserId}`)
+      
+      // Check if the outbid user is still in a winning position
+      const allBids = await supabase
+        .from('bids')
+        .select('user_id, amount')
+        .eq('auction_id', auction.id)
+        .eq('status', 'active')
+        .order('amount', { ascending: false })
+        
+      if (allBids.error) {
+        console.error(`Error fetching bids: ${allBids.error.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching bids: ${allBids.error.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      // Get user details of the outbid user
+      console.log(`Fetching outbid user details for ID: ${outbidUserId}`)
+      const { data: outbidUserData, error: outbidUserError } = await supabase.auth.admin.getUserById(outbidUserId)
+
+      if (outbidUserError) {
+        console.error(`Error fetching outbid user: ${outbidUserError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching outbid user: ${outbidUserError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      const outbidUserEmail = outbidUserData.user?.email
+      if (!outbidUserEmail) {
+        console.error(`No email found for outbid user: ${outbidUserId}`)
+        return new Response(
+          JSON.stringify({ error: `No email found for outbid user: ${outbidUserId}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      // Get the highest bid of the outbid user
+      const userHighestBid = allBids.data
+        .filter(bid => bid.user_id === outbidUserId)
+        .sort((a, b) => b.amount - a.amount)[0]
+      
+      // Check if user is still in a winning position (top X bidders where X is max_spots)
+      const topBidders = new Set()
+      const uniqueBidders = new Map()
+      
+      for (const bid of allBids.data) {
+        if (!uniqueBidders.has(bid.user_id) || uniqueBidders.get(bid.user_id) < bid.amount) {
+          uniqueBidders.set(bid.user_id, bid.amount)
+        }
+      }
+      
+      // Sort by bid amount and take top max_spots
+      Array.from(uniqueBidders.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, auction.max_spots)
+        .forEach(([userId]) => {
+          topBidders.add(userId)
+        })
+      
+      const isStillInWinningPosition = topBidders.has(outbidUserId)
+      
+      // Get the minimum winning bid amount
+      const minWinningBid = Array.from(uniqueBidders.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, auction.max_spots)
+        .pop()?.[1] || 0
+      
+      console.log(`Sending outbid notification to: ${outbidUserEmail}`)
+      console.log(`User is${isStillInWinningPosition ? '' : ' not'} in a winning position`)
+      console.log(`Minimum winning bid amount: ${minWinningBid}`)
+      
+      try {
+        const emailResult = await smtpClient.sendAsync({
+          from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+          to: outbidUserEmail,
+          subject: `You've been outbid on auction: ${auction.title}`,
+          text: `You've been outbid on the auction: ${auction.title}.
+            New highest bid: $${newBidAmount}.
+            ${isStillInWinningPosition 
+              ? `You're still in a winning position! Your highest bid of $${userHighestBid?.amount || 0} still secures you a spot in the top ${auction.max_spots} bidders.` 
+              : `You're no longer in a winning position. Your highest bid of $${userHighestBid?.amount || 0} is below the current minimum winning bid of $${minWinningBid}.`}
+            ${!isStillInWinningPosition ? `You need to place a new bid of at least $${minWinningBid + 1} to secure a spot again.` : ''}
+            Please check the auction for more details.`,
+          attachment: [
+            {
+              data: `
+                <h1>You've Been Outbid!</h1>
+                <p>Someone has placed a higher bid on the auction: <strong>${auction.title}</strong></p>
+                <p>New highest bid: <strong>$${newBidAmount}</strong></p>
+                ${isStillInWinningPosition 
+                  ? `<div style="background-color: #e6f4ea; padding: 10px; border-radius: 4px; margin: 15px 0;">
+                      <h3 style="color: #137333; margin-top: 0;">You're Still in a Winning Position!</h3>
+                      <p>Your highest bid of <strong>$${userHighestBid?.amount || 0}</strong> still secures you a spot in the top ${auction.max_spots} bidders.</p>
+                      <p>Continue monitoring the auction to ensure you maintain your position.</p>
+                    </div>` 
+                  : `<div style="background-color: #fce8e6; padding: 10px; border-radius: 4px; margin: 15px 0;">
+                      <h3 style="color: #c5221f; margin-top: 0;">You're No Longer in a Winning Position</h3>
+                      <p>Your highest bid of <strong>$${userHighestBid?.amount || 0}</strong> is below the current minimum winning bid of <strong>$${minWinningBid}</strong>.</p>
+                      <p>You need to place a new bid of at least <strong>$${minWinningBid + 1}</strong> to secure a spot again.</p>
+                      <p><a href="${Deno.env.get('PUBLIC_URL') || ''}/auction/${auction.id}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">Place New Bid</a></p>
+                    </div>`}
+                <p>Auction details:</p>
+                <ul>
+                  <li>Description: ${auction.description}</li>
+                  <li>Starting price: $${auction.starting_price}</li>
+                  <li>Current highest bid: $${newBidAmount}</li>
+                  <li>Your highest bid: $${userHighestBid?.amount || 0}</li>
+                </ul>
+                <p>Thank you for participating!</p>
+              `,
+              alternative: true
+            }
+          ]
+        });
+        
+        console.log(`Outbid email sent to ${outbidUserEmail}:`, emailResult);
+        
+        // Create notification in database
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: outbidUserId,
+            type: 'outbid',
+            message: `You've been outbid on auction: ${auction.title}. New highest bid: $${newBidAmount}.`,
+            auction_id: auction.id
+          });
+        
+        return new Response(
+          JSON.stringify({
+            message: `Outbid notification email sent to ${outbidUserEmail}`,
+            success: true
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error(`Error sending outbid email to ${outbidUserEmail}:`, error);
+        return new Response(
+          JSON.stringify({ error: `Error sending outbid email: ${error.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // If notifyAllUsers is true, notify all users

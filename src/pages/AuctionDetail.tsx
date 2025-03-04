@@ -303,6 +303,15 @@ export default function AuctionDetail() {
     }
 
     try {
+      const highestBid = bids.find(bid => 
+        bid.amount === auction.current_price && 
+        bid.status === 'active' && 
+        bid.user_id !== currentUser
+      );
+      
+      const outbidUserId = highestBid?.user_id;
+      console.log("Current highest bidder who will be outbid:", outbidUserId);
+
       const { data, error } = await supabase
         .from('bids')
         .insert([
@@ -350,6 +359,24 @@ export default function AuctionDetail() {
           });
         } else {
           console.log('Notification response:', notificationData);
+        }
+        
+        // Send specific outbid notification if someone was outbid
+        if (outbidUserId) {
+          console.log('Sending outbid notification to user:', outbidUserId);
+          
+          const { data: outbidData, error: outbidError } = await supabase.functions.invoke('bid-notification-email', {
+            body: { 
+              auctionId: auction.id,
+              outbidUserId: outbidUserId
+            }
+          });
+          
+          if (outbidError) {
+            console.error('Error sending outbid notification:', outbidError);
+          } else {
+            console.log('Outbid notification response:', outbidData);
+          }
         }
       } catch (notificationError) {
         console.error('Failed to invoke bid notification function:', notificationError);
