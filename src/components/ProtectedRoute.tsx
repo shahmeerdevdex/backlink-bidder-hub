@@ -65,8 +65,7 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
                 {resendingEmail ? 'Sending...' : 'Resend Verification Email'}
               </Button>
               <AlertDialogAction asChild>
-                <Button onClick={() => setShowVerificationDialog(false)}>
-                  <Navigate to="/auth" replace />
+                <Button onClick={() => <Navigate to="/auth" replace />}>
                   Back to Login
                 </Button>
               </AlertDialogAction>
