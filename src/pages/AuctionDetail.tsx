@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, Clock, CreditCard, DollarSign, Users, X, XCircle, Shield } from 'lucide-react';
+import { CheckCircle, Clock, CreditCard, DollarSign, Users, X, XCircle, Shield, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -96,7 +95,6 @@ export default function AuctionDetail() {
       setAuction(data);
       setEmailsSent(data.winners_processed || false);
       
-      // Check if auction has ended
       const endTime = new Date(data.ends_at);
       setIsAuctionEnded(endTime <= new Date());
     };
@@ -370,7 +368,6 @@ export default function AuctionDetail() {
     if (userWinner && userWinner.winning_bid_id) {
       bidId = userWinner.winning_bid_id;
     } else {
-      // If no specific winning bid is recorded, find user's highest bid
       const userBids = bids.filter(bid => bid.user_id === currentUser && bid.status === 'active')
                           .sort((a, b) => b.amount - a.amount);
       
@@ -397,13 +394,15 @@ export default function AuctionDetail() {
     (userWinner.status === 'pending_payment' || 
      (isAuctionEnded && topBidders.has(currentUser || '')));
   
-  // Get the user's highest active bid
   const userHighestBid = currentUser ? 
     bids.filter(bid => bid.user_id === currentUser && bid.status === 'active')
         .sort((a, b) => b.amount - a.amount)[0] : null;
   
-  // Check if user has a secure place (their bid is in top spots)
   const userHasSecurePlace = currentUser && topBidders.has(currentUser);
+  
+  const userHasBidsButNotWinning = currentUser && 
+    bids.some(bid => bid.user_id === currentUser && bid.status === 'active') && 
+    !topBidders.has(currentUser);
   
   return (
     <div className="container mx-auto px-4 py-8">
@@ -433,6 +432,13 @@ export default function AuctionDetail() {
                 <Badge variant="outline" className="border-green-500 text-green-600 bg-green-50">
                   <Shield className="w-4 h-4 mr-1" />
                   Securing a place
+                </Badge>
+              )}
+              
+              {userHasBidsButNotWinning && !isAuctionEnded && (
+                <Badge variant="outline" className="border-yellow-500 text-yellow-600 bg-yellow-50">
+                  <AlertTriangle className="w-4 h-4 mr-1" />
+                  Not winning
                 </Badge>
               )}
             </div>
@@ -466,6 +472,63 @@ export default function AuctionDetail() {
               <p className="text-sm text-green-700">Keep an eye on the auction as others may place higher bids.</p>
             </div>
           )}
+          
+          {userHasBidsButNotWinning && !isAuctionEnded && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h3 className="text-xl font-semibold text-yellow-700 mb-2">Your bid is not high enough!</h3>
+              <p className="mb-2">You have placed bids, but they're not among the top {auction.max_spots} bids right now.</p>
+              <p className="mb-4 text-sm text-yellow-700">
+                Consider placing a higher bid to secure your place in this auction.
+              </p>
+              {userHighestBid && (
+                <div className="text-sm bg-white p-2 rounded mb-4">
+                  <p>Your highest bid: <strong>${userHighestBid.amount}</strong></p>
+                  <p>Current minimum winning bid: <strong>${
+                    bids.filter(bid => bid.status === 'active')
+                        .sort((a, b) => b.amount - a.amount)
+                        .slice(0, auction.max_spots)
+                        .pop()?.amount || auction.current_price
+                  }</strong></p>
+                </div>
+              )}
+              <Input
+                type="number"
+                placeholder="Enter higher bid amount"
+                value={bidAmount}
+                onChange={(e) => setBidAmount(e.target.value)}
+                min={auction.current_price + 1}
+                className="mb-2"
+              />
+              <Button 
+                onClick={handleBid}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                Place Higher Bid
+              </Button>
+            </div>
+          )}
+          
+          {currentUser && !userHasBidsButNotWinning && !userHasSecurePlace && !isUserEligibleToPay && !isAuctionEnded && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-xl font-semibold text-blue-700 mb-2">Place a bid to secure your spot!</h3>
+              <p className="mb-4">You haven't placed any bids yet. Place a bid now to secure one of the {auction.max_spots} available spots.</p>
+              <div className="flex gap-4">
+                <Input
+                  type="number"
+                  placeholder="Enter bid amount"
+                  value={bidAmount}
+                  onChange={(e) => setBidAmount(e.target.value)}
+                  min={auction.current_price + 1}
+                />
+                <Button 
+                  onClick={handleBid}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Place Bid
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
@@ -481,7 +544,7 @@ export default function AuctionDetail() {
                 </div>
               </div>
 
-              {!isAuctionEnded && (
+              {!isAuctionEnded && !userHasBidsButNotWinning && (
                 <div className="pt-4">
                   <div className="flex gap-4">
                     <Input
