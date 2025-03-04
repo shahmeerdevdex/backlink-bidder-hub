@@ -34,9 +34,9 @@ Deno.serve(async (req) => {
     console.log('Raw request body:', requestText)
     
     const requestData = JSON.parse(requestText)
-    const { bidId } = requestData
+    const { bidId, notifyAllUsers } = requestData
     
-    console.log(`Processing notification for bid ID: ${bidId}`)
+    console.log(`Processing notification for bid ID: ${bidId}, notifyAllUsers: ${notifyAllUsers}`)
     
     if (!bidId) {
       console.error('Missing required parameter: bidId')
@@ -97,13 +97,87 @@ Deno.serve(async (req) => {
     const bidderEmail = bidderData.user?.email || 'Unknown bidder'
     console.log(`Bidder email: ${bidderEmail}`)
 
-    // If this is an initial bid (from auction creation), notify auction creator only
-    if (bid.is_initial) {
-      console.log('This is an initial bid from auction creation, notifying only the creator')
+    // If this is an initial bid (from auction creation) or notifyAllUsers is true, notify all users
+    if (bid.is_initial || notifyAllUsers) {
+      console.log('This is an initial bid from auction creation or notifyAllUsers is true, notifying all users')
       
-      // Send email to the auction creator
+      // Get all users from profiles
+      const { data: allProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email')
+      
+      if (profilesError) {
+        console.error(`Error fetching profiles: ${profilesError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching profiles: ${profilesError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      console.log(`Found ${allProfiles.length} users to notify about new auction`)
+      
+      const emailPromises = []
+      
+      // Send email to all users about the new auction
+      for (const profile of allProfiles) {
+        if (!profile.email) continue
+        
+        console.log(`Sending email to: ${profile.email} about new auction`)
+        
+        const emailPromise = resend.emails.send({
+          from: 'Auction System <onboarding@resend.dev>',
+          to: profile.email,
+          subject: `New Auction Created: ${auction.title}`,
+          html: `
+            <h1>New Auction Alert!</h1>
+            <p>A new auction has been created: <strong>${auction.title}</strong></p>
+            <p>Auction details:</p>
+            <ul>
+              <li>Description: ${auction.description}</li>
+              <li>Starting price: $${auction.starting_price}</li>
+              <li>Maximum spots: ${auction.max_spots}</li>
+              <li>End date: ${new Date(auction.ends_at).toLocaleString()}</li>
+            </ul>
+            <p>Don't miss your chance to bid on this exciting auction!</p>
+            <p>Thank you for using our auction system!</p>
+          `
+        })
+          .then(result => {
+            console.log(`Email sent successfully to ${profile.email}, result:`, result)
+            
+            // Create notification in database for all users except creator
+            if (profile.id !== bid.user_id) {
+              return supabase
+                .from('notifications')
+                .insert({
+                  user_id: profile.id,
+                  type: 'new_auction',
+                  message: `New auction created: ${auction.title}`,
+                  auction_id: bid.auction_id
+                })
+                .then(({ error: notificationError }) => {
+                  if (notificationError) {
+                    console.error(`Error creating notification: ${notificationError.message}`)
+                  } else {
+                    console.log(`Notification created for user ${profile.id}`)
+                  }
+                  return { success: true, email: profile.email }
+                })
+            }
+            
+            return { success: true, email: profile.email }
+          })
+          .catch(error => {
+            console.error(`Error sending email to ${profile.email}: ${error.message}`)
+            return { success: false, email: profile.email, error: error.message }
+          })
+        
+        emailPromises.push(emailPromise)
+      }
+      
+      // Send special email to the auction creator
       try {
-        const emailResult = await resend.emails.send({
+        const creatorEmailResult = await resend.emails.send({
           from: 'Auction System <onboarding@resend.dev>',
           to: bidderEmail,
           subject: `Your auction "${auction.title}" has been created`,
@@ -121,25 +195,31 @@ Deno.serve(async (req) => {
           `
         });
 
-        console.log(`Email sent to creator (${bidderEmail}):`, emailResult);
-      
-        return new Response(
-          JSON.stringify({
-            message: `Auction creation email sent to ${bidderEmail}`,
-            success: true
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        console.log(`Special email sent to creator (${bidderEmail}):`, creatorEmailResult);
       } catch (error) {
-        console.error(`Error sending email to creator: ${error.message}`);
-        return new Response(
-          JSON.stringify({ error: `Error sending email to creator: ${error.message}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.error(`Error sending special email to creator: ${error.message}`);
       }
+      
+      // Wait for all emails to be sent
+      console.log(`Waiting for ${emailPromises.length} emails to be sent`)
+      const results = await Promise.all(emailPromises)
+      console.log(`Email sending results:`, results)
+      
+      // Count successful emails
+      const successCount = results.filter(r => r.success).length
+      console.log(`Successfully sent ${successCount} emails`)
+      
+      return new Response(
+        JSON.stringify({
+          message: `Sent ${successCount} notification emails about new auction`,
+          successCount,
+          results
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     // For regular bids, get all unique bidders for this auction (except the current bidder)

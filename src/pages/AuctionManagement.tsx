@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -111,7 +112,7 @@ export default function AuctionManagement() {
       
       if (auctionId && !editingAuction) {
         try {
-          console.log('New auction created. Invoking bid-notification-email for auction ID:', auctionId);
+          console.log('New auction created. Creating initial bid and sending notification emails for auction ID:', auctionId);
           
           const { data: bidData, error: bidError } = await supabase
             .from('bids')
@@ -128,7 +129,10 @@ export default function AuctionManagement() {
             console.error('Error creating initial bid:', bidError);
           } else if (bidData && bidData[0]) {
             const { data: notificationData, error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
-              body: { bidId: bidData[0].id }
+              body: { 
+                bidId: bidData[0].id,
+                notifyAllUsers: true
+              }
             });
 
             if (notificationError) {
