@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -32,6 +33,7 @@ interface UserBid {
   amount: number;
   auction_id: string;
   created_at: string;
+  auction_title?: string; // Add auction title
   // Add other properties as needed
 }
 
@@ -41,6 +43,7 @@ interface AuctionWinner {
   user_id: string;
   status: string;
   payment_deadline: string;
+  auction_title?: string; // Add auction title
   // Add other properties as needed
 }
 
@@ -84,23 +87,47 @@ export default function UserDashboard() {
         if (auctionsError) throw auctionsError;
         setActiveAuctions(auctionsData || []);
 
-        // Fetch user's bids
+        // Fetch user's bids with auction titles
         const { data: bidsData, error: bidsError } = await supabase
           .from('bids')
-          .select('*')
+          .select(`
+            *,
+            auctions:auction_id (
+              title
+            )
+          `)
           .eq('user_id', user.id);
 
         if (bidsError) throw bidsError;
-        setUserBids(bidsData || []);
+        
+        // Process bids data to include auction title
+        const processedBids = (bidsData || []).map(bid => ({
+          ...bid,
+          auction_title: bid.auctions?.title || 'Unknown Auction'
+        }));
+        
+        setUserBids(processedBids);
 
-        // Fetch auctions won by the user
+        // Fetch auctions won by the user with auction titles
         const { data: winnersData, error: winnersError } = await supabase
           .from('auction_winners')
-          .select('*')
+          .select(`
+            *,
+            auctions:auction_id (
+              title
+            )
+          `)
           .eq('user_id', user.id);
 
         if (winnersError) throw winnersError;
-        setWonAuctions(winnersData || []);
+        
+        // Process winners data to include auction title
+        const processedWinners = (winnersData || []).map(winner => ({
+          ...winner,
+          auction_title: winner.auctions?.title || 'Unknown Auction'
+        }));
+        
+        setWonAuctions(processedWinners);
       } catch (error: any) {
         console.error('Error fetching data:', error);
         toast({
@@ -238,7 +265,7 @@ export default function UserDashboard() {
                       userBids.map((bid) => (
                         <TableRow key={bid.id}>
                           <TableCell className="font-medium">
-                            Auction #{bid.auction_id.substring(0, 8)}...
+                            {bid.auction_title}
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="bg-green-100 text-green-800">
@@ -289,7 +316,7 @@ export default function UserDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Auction ID</TableHead>
+                      <TableHead>Auction</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment Deadline</TableHead>
                       <TableHead>Actions</TableHead>
@@ -300,7 +327,7 @@ export default function UserDashboard() {
                       wonAuctions.map((winner) => (
                         <TableRow key={winner.id}>
                           <TableCell className="font-medium">
-                            {winner.auction_id.substring(0, 8)}...
+                            {winner.auction_title}
                           </TableCell>
                           <TableCell>
                             <Badge 
