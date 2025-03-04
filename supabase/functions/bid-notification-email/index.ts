@@ -1,15 +1,19 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
-import { Resend } from 'npm:resend@2.0.0'
+import { SMTPClient } from 'npm:emailjs@4.0.3'
 
 // Initialize Supabase client with admin privileges
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Initialize Resend email client
-const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? ''
-const resend = new Resend(resendApiKey)
+// Initialize SMTP client for Gmail
+const smtpClient = new SMTPClient({
+  user: 'shahmeerhussainkhadmi@gmail.com',
+  password: 'pssw zbin pbic omuc',
+  host: 'smtp.gmail.com',
+  ssl: true,
+})
 
 // CORS headers
 const corsHeaders = {
@@ -176,23 +180,34 @@ Deno.serve(async (req) => {
         
         console.log(`Sending email to: ${profile.email} about new auction`)
         
-        const emailPromise = resend.emails.send({
-          from: 'Auction System <onboarding@resend.dev>',
+        const emailPromise = smtpClient.sendAsync({
+          from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
           to: profile.email,
           subject: `New Auction Created: ${auction.title}`,
-          html: `
-            <h1>New Auction Alert!</h1>
-            <p>A new auction has been created: <strong>${auction.title}</strong></p>
-            <p>Auction details:</p>
-            <ul>
-              <li>Description: ${auction.description}</li>
-              <li>Starting price: $${auction.starting_price}</li>
-              <li>Maximum spots: ${auction.max_spots}</li>
-              <li>End date: ${new Date(auction.ends_at).toLocaleString()}</li>
-            </ul>
-            <p>Don't miss your chance to bid on this exciting auction!</p>
-            <p>Thank you for using our auction system!</p>
-          `
+          text: `A new auction has been created: ${auction.title}. 
+            Description: ${auction.description}. 
+            Starting price: $${auction.starting_price}. 
+            Maximum spots: ${auction.max_spots}. 
+            End date: ${new Date(auction.ends_at).toLocaleString()}.
+            Don't miss your chance to bid on this exciting auction!`,
+          attachment: [
+            {
+              data: `
+                <h1>New Auction Alert!</h1>
+                <p>A new auction has been created: <strong>${auction.title}</strong></p>
+                <p>Auction details:</p>
+                <ul>
+                  <li>Description: ${auction.description}</li>
+                  <li>Starting price: $${auction.starting_price}</li>
+                  <li>Maximum spots: ${auction.max_spots}</li>
+                  <li>End date: ${new Date(auction.ends_at).toLocaleString()}</li>
+                </ul>
+                <p>Don't miss your chance to bid on this exciting auction!</p>
+                <p>Thank you for using our auction system!</p>
+              `,
+              alternative: true
+            }
+          ]
         })
           .then(result => {
             console.log(`Email sent successfully to ${profile.email}, result:`, result)
@@ -229,22 +244,33 @@ Deno.serve(async (req) => {
       
       // Send special email to the auction creator
       try {
-        const creatorEmailResult = await resend.emails.send({
-          from: 'Auction System <onboarding@resend.dev>',
+        const creatorEmailResult = await smtpClient.sendAsync({
+          from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
           to: bidderEmail,
           subject: `Your auction "${auction.title}" has been created`,
-          html: `
-            <h1>Your Auction Has Been Created!</h1>
-            <p>Your auction "<strong>${auction.title}</strong>" has been successfully created.</p>
-            <p>Auction details:</p>
-            <ul>
-              <li>Description: ${auction.description}</li>
-              <li>Starting price: $${auction.starting_price}</li>
-              <li>Maximum spots: ${auction.max_spots}</li>
-            </ul>
-            <p>You will receive notifications when users place bids on your auction.</p>
-            <p>Thank you for using our auction system!</p>
-          `
+          text: `Your auction "${auction.title}" has been successfully created.
+            Description: ${auction.description}.
+            Starting price: $${auction.starting_price}.
+            Maximum spots: ${auction.max_spots}.
+            You will receive notifications when users place bids on your auction.
+            Thank you for using our auction system!`,
+          attachment: [
+            {
+              data: `
+                <h1>Your Auction Has Been Created!</h1>
+                <p>Your auction "<strong>${auction.title}</strong>" has been successfully created.</p>
+                <p>Auction details:</p>
+                <ul>
+                  <li>Description: ${auction.description}</li>
+                  <li>Starting price: $${auction.starting_price}</li>
+                  <li>Maximum spots: ${auction.max_spots}</li>
+                </ul>
+                <p>You will receive notifications when users place bids on your auction.</p>
+                <p>Thank you for using our auction system!</p>
+              `,
+              alternative: true
+            }
+          ]
         });
 
         console.log(`Special email sent to creator (${bidderEmail}):`, creatorEmailResult);
@@ -321,23 +347,34 @@ Deno.serve(async (req) => {
       console.log(`Sending email to: ${userEmail}`)
 
       // Prepare email content
-      const emailPromise = resend.emails.send({
-        from: 'Auction System <onboarding@resend.dev>',
+      const emailPromise = smtpClient.sendAsync({
+        from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
         to: userEmail,
         subject: `New bid placed on auction: ${auction.title}`,
-        html: `
-          <h1>New Bid Alert!</h1>
-          <p>A new bid has been placed on the auction: <strong>${auction.title}</strong></p>
-          <p>New bid amount: <strong>$${bidId ? requestData.amount : auction.current_price}</strong></p>
-          <p>Auction details:</p>
-          <ul>
-            <li>Description: ${auction.description}</li>
-            <li>Starting price: $${auction.starting_price}</li>
-            <li>Current highest bid: $${auction.current_price}</li>
-          </ul>
-          <p>Your position may have changed. Please log in to check your status.</p>
-          <p>Thank you for participating!</p>
-        `
+        text: `A new bid has been placed on the auction: ${auction.title}.
+          New bid amount: $${bidId ? requestData.amount : auction.current_price}.
+          Auction description: ${auction.description}.
+          Starting price: $${auction.starting_price}.
+          Current highest bid: $${auction.current_price}.
+          Your position may have changed. Please log in to check your status.`,
+        attachment: [
+          {
+            data: `
+              <h1>New Bid Alert!</h1>
+              <p>A new bid has been placed on the auction: <strong>${auction.title}</strong></p>
+              <p>New bid amount: <strong>$${bidId ? requestData.amount : auction.current_price}</strong></p>
+              <p>Auction details:</p>
+              <ul>
+                <li>Description: ${auction.description}</li>
+                <li>Starting price: $${auction.starting_price}</li>
+                <li>Current highest bid: $${auction.current_price}</li>
+              </ul>
+              <p>Your position may have changed. Please log in to check your status.</p>
+              <p>Thank you for participating!</p>
+            `,
+            alternative: true
+          }
+        ]
       })
         .then(result => {
           console.log(`Email sent successfully to ${userEmail}, result:`, result)

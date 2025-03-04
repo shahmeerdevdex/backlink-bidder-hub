@@ -1,15 +1,19 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
-import { Resend } from 'npm:resend@2.0.0'
+import { SMTPClient } from 'npm:emailjs@4.0.3'
 
 // Initialize Supabase client with admin privileges
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Initialize Resend email client
-const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? ''
-const resend = new Resend(resendApiKey)
+// Initialize SMTP client for Gmail
+const smtpClient = new SMTPClient({
+  user: 'shahmeerhussainkhadmi@gmail.com',
+  password: 'pssw zbin pbic omuc',
+  host: 'smtp.gmail.com',
+  ssl: true,
+})
 
 // CORS headers
 const corsHeaders = {
@@ -19,7 +23,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   console.log('⚡ [INVOKED] send-winner-email function started')
-  console.log('Resend API Key exists:', !!resendApiKey)
+  console.log('SMTP client configured:', !!smtpClient)
   console.log('Supabase URL:', supabaseUrl)
   console.log('Supabase Service Role Key exists:', !!supabaseKey)
   
@@ -114,17 +118,23 @@ Deno.serve(async (req) => {
       console.log(`Processing email to: ${userEmail}`)
 
       // Prepare email content
-      const emailPromise = resend.emails.send({
-        from: 'Auction System <onboarding@resend.dev>',
+      const emailPromise = smtpClient.sendAsync({
+        from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
         to: userEmail,
         subject: `Congratulations! You've won the auction: ${auction.title}`,
-        html: `
-          <h1>Congratulations!</h1>
-          <p>You are one of the winning bidders for the auction: <strong>${auction.title}</strong></p>
-          <p>Your winning bid amount: <strong>$${bid.amount}</strong></p>
-          <p>Please log in to your account to complete the payment process within 24 hours.</p>
-          <p>Thank you for participating!</p>
-        `
+        text: `Congratulations! You are one of the winning bidders for the auction: ${auction.title}. Your winning bid amount: $${bid.amount}. Please log in to your account to complete the payment process within 24 hours. Thank you for participating!`,
+        attachment: [
+          {
+            data: `
+              <h1>Congratulations!</h1>
+              <p>You are one of the winning bidders for the auction: <strong>${auction.title}</strong></p>
+              <p>Your winning bid amount: <strong>$${bid.amount}</strong></p>
+              <p>Please log in to your account to complete the payment process within 24 hours.</p>
+              <p>Thank you for participating!</p>
+            `,
+            alternative: true
+          }
+        ]
       })
         .then(result => {
           console.log(`Email sent successfully to ${userEmail}, result:`, result)
