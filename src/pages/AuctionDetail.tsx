@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -335,6 +336,19 @@ export default function AuctionDetail() {
           variant: "destructive",
         });
         return;
+      }
+
+      // Send email notifications to all bidders
+      try {
+        const { error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
+          body: { bidId: data.id }
+        });
+
+        if (notificationError) {
+          console.error('Error sending bid notifications:', notificationError);
+        }
+      } catch (notificationError) {
+        console.error('Failed to invoke bid notification function:', notificationError);
       }
 
       setBidAmount('');
