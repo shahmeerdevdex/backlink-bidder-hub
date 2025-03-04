@@ -10,15 +10,42 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Github } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('signin');
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  
+  // Check if the URL has a hash for password recovery or email verification
+  useEffect(() => {
+    // Check if URL contains reset password token
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setActiveTab('resetPassword');
+      // Extract token from URL if available
+      const token = new URLSearchParams(hash.substring(1)).get('access_token');
+      if (token) {
+        toast({
+          title: "Password Reset",
+          description: "Please enter your new password.",
+        });
+      }
+    }
+    
+    // Check if URL contains email verification success
+    if (hash && hash.includes('type=signup')) {
+      toast({
+        title: "Email Verified",
+        description: "Your email has been verified. You can now sign in.",
+      });
+    }
+  }, [toast]);
 
   // Redirect if user is already logged in
   useEffect(() => {
@@ -35,6 +62,9 @@ export default function Auth() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth`,
+      }
     });
 
     if (error) {
@@ -48,6 +78,7 @@ export default function Auth() {
         title: "Success!",
         description: "Please check your email to confirm your account.",
       });
+      setActiveTab('signin');
     }
     setLoading(false);
   };
@@ -71,9 +102,69 @@ export default function Auth() {
     setLoading(false);
   };
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth#type=recovery`,
+    });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Recovery Email Sent",
+        description: "Check your email for the password reset link.",
+      });
+      setActiveTab('signin');
+    }
+    setLoading(false);
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password || password.length < 6) {
+      toast({
+        title: "Invalid Password",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
+
+    if (error) {
+      toast({
+        title: "Error updating password",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Password Updated",
+        description: "Your password has been successfully updated. You can now sign in.",
+      });
+      setActiveTab('signin');
+    }
+    setLoading(false);
+  };
+
   const handleGithubLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
+      options: {
+        redirectTo: `${window.location.origin}/auth`,
+      }
     });
 
     if (error) {
@@ -93,10 +184,11 @@ export default function Auth() {
           <CardDescription>Sign in to start bidding on auctions</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin">
-            <TabsList className="grid w-full grid-cols-2 mb-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-3 mb-8">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="resetPassword">Reset</TabsTrigger>
             </TabsList>
 
             <TabsContent value="signin">
@@ -126,6 +218,16 @@ export default function Auth() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Signing in...' : 'Sign In'}
                 </Button>
+                <div className="text-center mt-2">
+                  <Button 
+                    variant="link" 
+                    type="button" 
+                    onClick={() => setActiveTab('resetPassword')}
+                    className="text-sm text-muted-foreground"
+                  >
+                    Forgot your password?
+                  </Button>
+                </div>
               </form>
             </TabsContent>
 
@@ -157,6 +259,44 @@ export default function Auth() {
                   {loading ? 'Signing up...' : 'Sign Up'}
                 </Button>
               </form>
+            </TabsContent>
+
+            <TabsContent value="resetPassword">
+              {window.location.hash.includes('type=recovery') ? (
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="Enter your new password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? 'Updating...' : 'Update Password'}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? 'Sending...' : 'Send Reset Link'}
+                  </Button>
+                </form>
+              )}
             </TabsContent>
           </Tabs>
 

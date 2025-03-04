@@ -1,26 +1,28 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { User } from '@supabase/supabase-js';
+import type { User, AuthChangeEvent } from '@supabase/supabase-js';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
-  signOut: () => Promise<void>; // Add signOut to the interface
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isAdmin: false,
-  signOut: async () => {} // Add default value for signOut
+  signOut: async () => {}
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -35,7 +37,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for changes on auth state (signed in, signed out, etc.)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
+      handleAuthChange(event, session?.user);
       setUser(session?.user ?? null);
       if (session?.user) {
         checkAdminStatus(session.user.id);
@@ -47,6 +50,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const handleAuthChange = (event: AuthChangeEvent, user: User | null) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      // Handle password recovery
+      toast({
+        title: "Password Recovery",
+        description: "You can now reset your password.",
+      });
+    } else if (event === 'SIGNED_IN') {
+      // Handle signed in
+      if (user && !user.email_confirmed_at) {
+        toast({
+          title: "Email Not Verified",
+          description: "Please check your email to verify your account.",
+          variant: "warning",
+        });
+      } else if (user) {
+        toast({
+          title: "Welcome Back",
+          description: `Signed in as ${user.email}`,
+        });
+      }
+    } else if (event === 'SIGNED_OUT') {
+      toast({
+        title: "Signed Out",
+        description: "You have been signed out.",
+      });
+    } else if (event === 'USER_UPDATED') {
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
+      });
+    }
+  };
 
   const checkAdminStatus = async (userId: string) => {
     const { data, error } = await supabase
