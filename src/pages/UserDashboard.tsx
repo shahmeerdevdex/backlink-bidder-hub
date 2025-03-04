@@ -106,7 +106,6 @@ export default function UserDashboard() {
     fetchData();
   }, [user, navigate, toast]);
 
-  // Fetch notifications
   useEffect(() => {
     if (!user) return;
     
@@ -151,7 +150,6 @@ export default function UserDashboard() {
     fetchNotifications().catch(err => console.error('Error fetching notifications:', err));
   }, [user, toast]);
 
-  // Handle notification click to navigate to auction
   const handleNotificationClick = (notification: Notification) => {
     if (notification.auction_id) {
       navigate(`/auctions/${notification.auction_id}`);
@@ -166,7 +164,7 @@ export default function UserDashboard() {
     <div className="container mx-auto py-10">
       <h1 className="text-3xl font-semibold mb-5">User Dashboard</h1>
 
-      <Tabs defaultvalue="activeAuctions" className="w-full">
+      <Tabs defaultValue="activeAuctions" className="w-full">
         <TabsList>
           <TabsTrigger value="activeAuctions">Active Auctions</TabsTrigger>
           <TabsTrigger value="myBids">My Bids</TabsTrigger>
