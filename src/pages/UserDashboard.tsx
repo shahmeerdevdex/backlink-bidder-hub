@@ -1,82 +1,38 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { Award, Clock, CreditCard, Trophy } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowRight, Clock, DollarSign } from 'lucide-react';
 
-interface Payment {
+interface Auction {
   id: string;
-  status: string;
-  amount: number;
+  title: string;
+  description: string;
+  ends_at: string;
+  current_price: number;
+  // Add other properties as needed
 }
 
-interface Bid {
+interface UserBid {
   id: string;
   amount: number;
+  auction_id: string;
   created_at: string;
-  status: string;
-  auction: {
-    id: string;
-    title: string;
-    ends_at: string;
-    current_price: number;
-  };
-  payments: Payment[];
-}
-
-interface WonAuction {
-  id: string;
-  status: string;
-  payment_deadline: string;
-  email_sent?: boolean;
-  auction: {
-    id: string;
-    title: string;
-    ends_at: string;
-  };
-  winning_bid: {
-    id: string;
-    amount: number;
-    payments: Payment[];
-  };
+  // Add other properties as needed
 }
 
 interface AuctionWinner {
-  user_id: string;
-  winning_bid: {
-    amount: number;
-  };
-}
-
-interface CompletedAuction {
   id: string;
-  title: string;
-  ends_at: string;
-  winners: Array<{
-    username: string | null;
-    bid_amount: number;
-    is_current_user: boolean;
-  }>;
+  auction_id: string;
+  user_id: string;
+  status: string;
+  payment_deadline: string;
+  // Add other properties as needed
 }
 
 // Update the Notification interface to include optional auction_id
@@ -91,25 +47,70 @@ interface Notification {
 }
 
 export default function UserDashboard() {
-  const [activeBids, setActiveBids] = useState<Bid[]>([]);
-  const [wonAuctions, setWonAuctions] = useState<WonAuction[]>([]);
-  const [completedAuctions, setCompletedAuctions] = useState<CompletedAuction[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [activeAuctions, setActiveAuctions] = useState<Auction[]>([]);
+  const [userBids, setUserBids] = useState<UserBid[]>([]);
+  const [wonAuctions, setWonAuctions] = useState<AuctionWinner[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
-    fetchUserData();
-    fetchNotifications();
-  }, [user]);
+    if (!user) {
+      navigate('/login');
+      return;
+    }
 
-  const fetchNotifications = async () => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch active auctions created by the user
+        const { data: auctionsData, error: auctionsError } = await supabase
+          .from('auctions')
+          .select('*')
+          .eq('creator_id', user.id)
+          .eq('status', 'active');
+
+        if (auctionsError) throw auctionsError;
+        setActiveAuctions(auctionsData || []);
+
+        // Fetch user's bids
+        const { data: bidsData, error: bidsError } = await supabase
+          .from('bids')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (bidsError) throw bidsError;
+        setUserBids(bidsData || []);
+
+        // Fetch auctions won by the user
+        const { data: winnersData, error: winnersError } = await supabase
+          .from('auction_winners')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (winnersError) throw winnersError;
+        setWonAuctions(winnersData || []);
+      } catch (error: any) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: 'Error',
+          description: error.message,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user, navigate, toast]);
+
+  // Fetch notifications
+  useEffect(() => {
     if (!user) return;
     
-    try {
+    const fetchNotifications = async () => {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -119,14 +120,15 @@ export default function UserDashboard() {
         
       if (error) throw error;
       
-      // Process the notifications to ensure the auction_id property is handled correctly
+      // Process the notifications data to ensure proper types
       const processedData = (data || []).map(notification => ({
         ...notification,
-        auction_id: (notification as any).auction_id || undefined
+        auction_id: notification.auction_id
       })) as Notification[];
       
       setNotifications(processedData);
       
+      // Show toast notifications for unread items
       processedData.filter(n => !n.read).forEach(notification => {
         toast({
           title: notification.type === 'winner' ? 'Auction Won!' : 'Notification',
@@ -134,6 +136,7 @@ export default function UserDashboard() {
         });
       });
       
+      // Mark notifications as read
       if (processedData && processedData.length > 0) {
         const unreadIds = processedData.filter(n => !n.read).map(n => n.id);
         if (unreadIds.length > 0) {
@@ -143,521 +146,119 @@ export default function UserDashboard() {
             .in('id', unreadIds);
         }
       }
-    } catch (error: any) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
-
-  const fetchUserData = async () => {
-    setIsLoading(true);
-    try {
-      const { data: bidsData, error: bidsError } = await supabase
-        .from('bids')
-        .select(`
-          id,
-          amount,
-          created_at,
-          status,
-          auction:auctions (
-            id,
-            title,
-            ends_at,
-            current_price
-          ),
-          payments:payments (
-            id,
-            status,
-            amount
-          )
-        `)
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (bidsError) throw bidsError;
-      setActiveBids(bidsData || []);
-
-      const { data: wonData, error: wonError } = await supabase
-        .from('auction_winners')
-        .select(`
-          id,
-          status,
-          payment_deadline,
-          auction:auctions (
-            id,
-            title,
-            ends_at
-          ),
-          winning_bid:bids (
-            id,
-            amount,
-            payments:payments (
-              id,
-              status,
-              amount
-            )
-          )
-        `)
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (wonError) throw wonError;
-      
-      const wonAuctionIds = wonData ? wonData.map(won => won.auction.id) : [];
-      
-      let winnerNotificationsMap: Record<string, boolean> = {};
-      
-      if (wonAuctionIds.length > 0) {
-        const { data: notifData, error: notifError } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('user_id', user?.id)
-          .eq('type', 'winner')
-          .in('auction_id', wonAuctionIds);
-          
-        if (notifError) {
-          console.error('Error fetching winner notifications:', notifError);
-        } else if (notifData) {
-          notifData.forEach(notif => {
-            if (notif.auction_id) {
-              winnerNotificationsMap[notif.auction_id] = true;
-            }
-          });
-        }
-      }
-      
-      const processedWonData = (wonData || []).map(auction => {
-        return {
-          ...auction,
-          email_sent: winnerNotificationsMap[auction.auction.id] || false
-        };
-      });
-      
-      console.log('Won auctions with email status:', processedWonData);
-      setWonAuctions(processedWonData);
-
-      const { data: userBids, error: userBidsError } = await supabase
-        .from('bids')
-        .select('auction_id')
-        .eq('user_id', user?.id)
-        .eq('status', 'active');
-      
-      if (userBidsError) throw userBidsError;
-      
-      const userAuctionIds = [...new Set((userBids || []).map(bid => bid.auction_id))];
-      
-      if (userAuctionIds.length === 0) {
-        setCompletedAuctions([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const { data: completed, error: completedError } = await supabase
-        .from('auctions')
-        .select('*')
-        .in('id', userAuctionIds)
-        .lt('ends_at', new Date().toISOString())
-        .order('ends_at', { ascending: false });
-
-      if (completedError) throw completedError;
-
-      const completedWithWinners = await Promise.all((completed || []).map(async (auction) => {
-        const { data: winners, error: winnersError } = await supabase
-          .from('auction_winners')
-          .select(`
-            user_id,
-            winning_bid:bids(amount)
-          `)
-          .eq('auction_id', auction.id);
-
-        if (winnersError) {
-          console.error('Error fetching winners:', winnersError);
-          return null;
-        }
-
-        const winnersWithUsernames = await Promise.all((winners || []).map(async (winner: AuctionWinner) => {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', winner.user_id)
-            .maybeSingle();
-          
-          return {
-            username: profile?.username || 'Anonymous',
-            bid_amount: winner.winning_bid.amount,
-            is_current_user: winner.user_id === user?.id
-          };
-        }));
-
-        return {
-          id: auction.id,
-          title: auction.title,
-          ends_at: auction.ends_at,
-          winners: winnersWithUsernames
-        };
-      }));
-
-      setCompletedAuctions(completedWithWinners.filter(Boolean) as CompletedAuction[]);
-      
-      const endedAuctions = completed?.filter(auction => {
-        const hasWinners = wonData?.some(won => won.auction.id === auction.id);
-        return !hasWinners && new Date(auction.ends_at) < new Date();
-      }) || [];
-      
-      if (endedAuctions.length > 0) {
-        for (const auction of endedAuctions) {
-          const { data: topBids, error: topBidsError } = await supabase
-            .from('bids')
-            .select('id, user_id, amount')
-            .eq('auction_id', auction.id)
-            .eq('status', 'active')
-            .order('amount', { ascending: false })
-            .limit(auction.max_spots || 3);
-            
-          if (topBidsError) {
-            console.error('Error fetching top bids:', topBidsError);
-            continue;
-          }
-          
-          const userBid = topBids?.find(bid => bid.user_id === user?.id);
-          if (userBid) {
-            const tempWonAuction: WonAuction = {
-              id: `temp_${auction.id}`,
-              status: 'pending_processing',
-              payment_deadline: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString(),
-              auction: {
-                id: auction.id,
-                title: auction.title,
-                ends_at: auction.ends_at
-              },
-              winning_bid: {
-                id: userBid.id,
-                amount: userBid.amount,
-                payments: []
-              },
-              email_sent: false
-            };
-            
-            setWonAuctions(prev => {
-              if (!prev.some(won => won.auction.id === auction.id)) {
-                return [...prev, tempWonAuction];
-              }
-              return prev;
-            });
-          }
-        }
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error fetching data",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getPaymentStatusBadge = (payments: Payment[] | undefined) => {
-    if (!payments || payments.length === 0) return <Badge variant="secondary">No Payment</Badge>;
+    };
     
-    const latestPayment = payments[0];
-    
-    switch (latestPayment.status) {
-      case 'completed':
-        return <Badge variant="default">Paid</Badge>;
-      case 'pending':
-        return <Badge variant="secondary">Pending</Badge>;
-      case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
-      default:
-        return <Badge variant="outline">{latestPayment.status}</Badge>;
+    fetchNotifications().catch(err => console.error('Error fetching notifications:', err));
+  }, [user, toast]);
+
+  // Handle notification click to navigate to auction
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.auction_id) {
+      navigate(`/auctions/${notification.auction_id}`);
     }
   };
 
-  const getWinnerStatusBadge = (auction: WonAuction) => {
-    if (auction.status === 'pending_processing') {
-      return <Badge variant="secondary">Processing</Badge>;
-    }
-    
-    const deadline = new Date(auction.payment_deadline);
-    const now = new Date();
-
-    switch (auction.status) {
-      case 'pending_payment':
-        return (
-          <div className="flex flex-col">
-            <Badge variant="secondary">Payment Required</Badge>
-            <span className="text-xs text-muted-foreground mt-1">
-              Due {format(deadline, 'PPp')}
-            </span>
-          </div>
-        );
-      case 'payment_missed':
-        return <Badge variant="destructive">Payment Missed</Badge>;
-      case 'paid':
-        return <Badge variant="default">Paid</Badge>;
-      default:
-        return <Badge variant="outline">{auction.status}</Badge>;
-    }
-  };
-
-  const handlePayment = (bidId: string) => {
-    console.log('Initiating payment for bid:', bidId);
-    navigate(`/payment/${bidId}`);
-  };
-
-  if (isLoading) {
-    return <div className="container mx-auto p-8">Loading...</div>;
+  if (loading) {
+    return <div>Loading...</div>;
   }
 
   return (
-    <div className="container mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-8">My Dashboard</h1>
+    <div className="container mx-auto py-10">
+      <h1 className="text-3xl font-semibold mb-5">User Dashboard</h1>
 
-      <Tabs defaultValue="bids" className="space-y-6">
+      <Tabs defaultvalue="activeAuctions" className="w-full">
         <TabsList>
-          <TabsTrigger value="bids">
-            <Clock className="w-4 h-4 mr-2" />
-            My Bids
-          </TabsTrigger>
-          <TabsTrigger value="won">
-            <Award className="w-4 h-4 mr-2" />
-            Won Auctions
-          </TabsTrigger>
-          <TabsTrigger value="completed">
-            <Trophy className="w-4 h-4 mr-2" />
-            Completed Auctions
-          </TabsTrigger>
-          <TabsTrigger value="payments">
-            <CreditCard className="w-4 h-4 mr-2" />
-            Payments
-          </TabsTrigger>
+          <TabsTrigger value="activeAuctions">Active Auctions</TabsTrigger>
+          <TabsTrigger value="myBids">My Bids</TabsTrigger>
+          <TabsTrigger value="wonAuctions">Won Auctions</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="bids">
-          <Card>
-            <CardHeader>
-              <CardTitle>My Bids</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Auction</TableHead>
-                    <TableHead>Your Bid</TableHead>
-                    <TableHead>Current Price</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeBids.map((bid) => (
-                    <TableRow key={bid.id}>
-                      <TableCell>{bid.auction.title}</TableCell>
-                      <TableCell>${bid.amount}</TableCell>
-                      <TableCell>${bid.auction.current_price}</TableCell>
-                      <TableCell>
-                        {format(new Date(bid.auction.ends_at), 'PPp')}
-                      </TableCell>
-                      <TableCell>
-                        {getPaymentStatusBadge(bid.payments)}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/auctions/${bid.auction.id}`)}
-                        >
-                          View Auction
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {activeBids.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center">
-                        You haven't placed any bids yet.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="activeAuctions" className="mt-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {activeAuctions.map((auction) => (
+              <Card key={auction.id}>
+                <CardHeader>
+                  <CardTitle>{auction.title}</CardTitle>
+                  <CardDescription>{auction.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>Current Price: ${auction.current_price}</p>
+                  <p>Ends At: {new Date(auction.ends_at).toLocaleString()}</p>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={() => navigate(`/auctions/${auction.id}`)}>
+                    View Auction <ArrowRight className="ml-2" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
-
-        <TabsContent value="won">
-          <Card>
-            <CardHeader>
-              <CardTitle>Won Auctions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Auction</TableHead>
-                    <TableHead>Winning Bid</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Payment Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {wonAuctions.map((won) => {
-                    console.log('Won auction row:', won.id, 'Status:', won.status, 'Email sent:', won.email_sent);
-                    return (
-                    <TableRow key={won.id}>
-                      <TableCell>{won.auction.title}</TableCell>
-                      <TableCell>${won.winning_bid.amount}</TableCell>
-                      <TableCell>
-                        {format(new Date(won.auction.ends_at), 'PPp')}
-                      </TableCell>
-                      <TableCell>
-                        {getWinnerStatusBadge(won)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/auctions/${won.auction.id}`)}
-                          >
-                            View Auction
-                          </Button>
-                          {(won.status === 'pending_payment' || won.email_sent === true) && 
-                           won.status !== 'paid' && (
-                            <Button
-                              size="sm"
-                              onClick={() => handlePayment(won.winning_bid.id)}
-                            >
-                              Pay Now
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )})}
-                  {wonAuctions.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center">
-                        You haven't won any auctions yet.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="myBids" className="mt-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userBids.map((bid) => (
+              <Card key={bid.id}>
+                <CardHeader>
+                  <CardTitle>Bid on Auction ID: {bid.auction_id}</CardTitle>
+                  <CardDescription>Placed on: {new Date(bid.created_at).toLocaleString()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>Amount: ${bid.amount}</p>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={() => navigate(`/auctions/${bid.auction_id}`)}>
+                    View Auction <ArrowRight className="ml-2" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
-
-        <TabsContent value="completed">
-          <Card>
-            <CardHeader>
-              <CardTitle>Completed Auctions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Auction</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Winners</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {completedAuctions.map((auction) => (
-                    <TableRow key={auction.id}>
-                      <TableCell>{auction.title}</TableCell>
-                      <TableCell>
-                        {format(new Date(auction.ends_at), 'PPp')}
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-2">
-                          {auction.winners.map((winner, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <Badge variant={winner.is_current_user ? "default" : "secondary"}>
-                                {index + 1}
-                              </Badge>
-                              <span className={winner.is_current_user ? "font-semibold" : ""}>
-                                {winner.username || 'Anonymous'}: ${winner.bid_amount}
-                              </span>
-                              {winner.is_current_user && (
-                                <Trophy className="w-4 h-4 text-yellow-500" />
-                              )}
-                            </div>
-                          ))}
-                          {auction.winners.length === 0 && (
-                            <span className="text-muted-foreground">No winners yet</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/auctions/${auction.id}`)}
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {completedAuctions.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center">
-                        No completed auctions available.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="wonAuctions" className="mt-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {wonAuctions.map((winner) => (
+              <Card key={winner.id}>
+                <CardHeader>
+                  <CardTitle>Won Auction ID: {winner.auction_id}</CardTitle>
+                  <CardDescription>Payment Deadline: {new Date(winner.payment_deadline).toLocaleString()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>Status: {winner.status}</p>
+                </CardContent>
+                <CardFooter>
+                  <Button onClick={() => navigate(`/auctions/${winner.auction_id}`)}>
+                    View Auction <ArrowRight className="ml-2" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
-
-        <TabsContent value="payments">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Auction</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeBids.filter(bid => bid.payments && bid.payments.length > 0).map((bid) => (
-                    bid.payments.map(payment => (
-                      <TableRow key={payment.id}>
-                        <TableCell>{bid.auction.title}</TableCell>
-                        <TableCell>${payment.amount}</TableCell>
-                        <TableCell>
-                          {format(new Date(bid.created_at), 'PPp')}
-                        </TableCell>
-                        <TableCell>
-                          {getPaymentStatusBadge([payment])}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ))}
-                  {activeBids.filter(bid => bid.payments && bid.payments.length > 0).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center">
-                        No payment history available.
-                      </TableCell>
-                    </TableRow>
+        <TabsContent value="notifications" className="mt-5">
+          <div className="grid grid-cols-1 gap-4">
+            {notifications.map((notification) => (
+              <Card key={notification.id} className="cursor-pointer" onClick={() => handleNotificationClick(notification)}>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    {notification.type === 'winner' && <DollarSign className="mr-2 h-4 w-4 text-green-500" />}
+                    {notification.type !== 'winner' && <Clock className="mr-2 h-4 w-4 text-gray-500" />}
+                    {notification.type}
+                  </CardTitle>
+                  <CardDescription>{new Date(notification.created_at).toLocaleString()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>{notification.message}</p>
+                </CardContent>
+                <CardFooter>
+                  {notification.read ? (
+                    <Badge variant="secondary">Read</Badge>
+                  ) : (
+                    <Badge>Unread</Badge>
                   )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

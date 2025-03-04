@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Award, ArrowUp, X } from 'lucide-react';
@@ -51,15 +50,14 @@ export function Notifications() {
       console.log('Raw notifications data:', data);
 
       // Process the data to ensure it matches our Notification interface
-      // This handles the type inconsistency and ensures auction_id is properly set
       const processedData: Notification[] = (data || []).map(item => ({
         id: item.id,
         user_id: item.user_id,
         // Cast the type to our specific union type
         type: (item.type as 'winner' | 'outbid' | 'auction_ending' | 'new_auction'),
         message: item.message,
-        // Add auction_id property even if it doesn't exist in the database
-        auction_id: (item as any).auction_id,
+        // Handle auction_id properly
+        auction_id: item.auction_id,
         read: !!item.read,
         created_at: item.created_at
       }));

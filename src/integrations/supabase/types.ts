@@ -152,6 +152,7 @@ export type Database = {
       }
       notifications: {
         Row: {
+          auction_id: string | null
           created_at: string | null
           id: string
           message: string
@@ -160,6 +161,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          auction_id?: string | null
           created_at?: string | null
           id?: string
           message: string
@@ -168,6 +170,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          auction_id?: string | null
           created_at?: string | null
           id?: string
           message?: string
@@ -176,6 +179,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_auction_id_fkey"
+            columns: ["auction_id"]
+            isOneToOne: false
+            referencedRelation: "auctions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_user_id_fkey"
             columns: ["user_id"]
