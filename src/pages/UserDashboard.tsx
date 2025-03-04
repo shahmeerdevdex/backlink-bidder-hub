@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -85,7 +84,7 @@ interface Notification {
   message: string;
   read: boolean;
   created_at: string;
-  auction_id?: string | null;
+  auction_id?: string;
   user_id: string;
 }
 

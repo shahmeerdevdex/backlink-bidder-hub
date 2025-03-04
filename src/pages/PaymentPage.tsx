@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { useAuth } from '@/components/AuthProvider';
 
 interface Bid {
   id: string;
@@ -29,146 +28,10 @@ export default function PaymentPage() {
   const [processingPayment, setProcessingPayment] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   useEffect(() => {
-    if (bidId) {
-      fetchBidDetails();
-    } else if (user) {
-      // If no specific bid ID is provided, fetch the highest bid for any won auction
-      fetchHighestWinningBid();
-    }
-  }, [bidId, user]);
-
-  const fetchHighestWinningBid = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      // First check if user has any won auctions with pending payment
-      const { data: winnerData, error: winnerError } = await supabase
-        .from('auction_winners')
-        .select(`
-          winning_bid_id,
-          auction:auctions(id, title, description)
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'pending_payment')
-        .maybeSingle();
-      
-      if (winnerError) {
-        console.error('Error fetching winner data:', winnerError);
-        throw winnerError;
-      }
-      
-      if (winnerData && winnerData.winning_bid_id) {
-        // If there's a winning bid, fetch its details
-        const { data: bidData, error: bidError } = await supabase
-          .from('bids')
-          .select('*')
-          .eq('id', winnerData.winning_bid_id)
-          .single();
-        
-        if (bidError) {
-          console.error('Error fetching bid details:', bidError);
-          throw bidError;
-        }
-        
-        setBid({
-          id: bidData.id,
-          amount: bidData.amount,
-          auction_id: bidData.auction_id,
-          status: bidData.status,
-        });
-        
-        if (winnerData.auction) {
-          setAuction({
-            id: winnerData.auction.id,
-            title: winnerData.auction.title,
-            description: winnerData.auction.description,
-          });
-        }
-      } else {
-        // If no specific winning bid, find the highest active bid in ended auctions
-        const now = new Date().toISOString();
-        
-        // Get all ended auctions where the user has placed bids
-        const { data: endedAuctions, error: auctionsError } = await supabase
-          .from('auctions')
-          .select('id, title, description')
-          .lt('ends_at', now)
-          .in('id', supabase.from('bids').select('auction_id').eq('user_id', user.id));
-        
-        if (auctionsError) {
-          console.error('Error fetching ended auctions:', auctionsError);
-          throw auctionsError;
-        }
-        
-        if (endedAuctions && endedAuctions.length > 0) {
-          // For each ended auction, get the user's highest bid
-          for (const auction of endedAuctions) {
-            const { data: highestBid, error: bidError } = await supabase
-              .from('bids')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('auction_id', auction.id)
-              .eq('status', 'active')
-              .order('amount', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            
-            if (bidError) {
-              console.error(`Error fetching highest bid for auction ${auction.id}:`, bidError);
-              continue;
-            }
-            
-            if (highestBid) {
-              // Check if this user is among the top bidders
-              const { data: topBids, error: topBidsError } = await supabase
-                .from('bids')
-                .select('id, amount, user_id')
-                .eq('auction_id', auction.id)
-                .eq('status', 'active')
-                .order('amount', { ascending: false })
-                .limit(auction.max_spots || 3);
-              
-              if (topBidsError) {
-                console.error(`Error fetching top bids for auction ${auction.id}:`, topBidsError);
-                continue;
-              }
-              
-              const isTopBidder = topBids?.some(bid => bid.user_id === user.id);
-              
-              if (isTopBidder) {
-                setBid({
-                  id: highestBid.id,
-                  amount: highestBid.amount,
-                  auction_id: highestBid.auction_id,
-                  status: highestBid.status,
-                });
-                
-                setAuction({
-                  id: auction.id,
-                  title: auction.title,
-                  description: auction.description,
-                });
-                
-                break;
-              }
-            }
-          }
-        }
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error fetching bid information",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchBidDetails();
+  }, [bidId]);
 
   const fetchBidDetails = async () => {
     if (!bidId) return;
@@ -242,7 +105,7 @@ export default function PaymentPage() {
       <div className="container mx-auto px-4 py-8">
         <Card>
           <CardContent className="py-8">
-            <p className="text-center text-muted-foreground">No eligible bid found for payment</p>
+            <p className="text-center text-muted-foreground">Bid not found</p>
           </CardContent>
         </Card>
       </div>

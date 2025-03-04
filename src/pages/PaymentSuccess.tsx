@@ -13,10 +13,6 @@ export default function PaymentSuccess() {
   const { toast } = useToast();
   const [isVerifying, setIsVerifying] = useState(true);
   const [paymentVerified, setPaymentVerified] = useState(false);
-  const [paymentDetails, setPaymentDetails] = useState<{
-    amount: number;
-    auctionTitle?: string;
-  } | null>(null);
   const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
@@ -30,18 +26,7 @@ export default function PaymentSuccess() {
         // Check if payment exists and is completed
         const { data, error } = await supabase
           .from('payments')
-          .select(`
-            id, 
-            status, 
-            amount, 
-            bid_id,
-            bid:bids (
-              auction_id,
-              auction:auctions (
-                title
-              )
-            )
-          `)
+          .select('id, status, amount')
           .eq('stripe_session_id', sessionId)
           .maybeSingle();
 
@@ -49,17 +34,12 @@ export default function PaymentSuccess() {
 
         if (data && data.status === 'completed') {
           setPaymentVerified(true);
-          setPaymentDetails({
-            amount: data.amount,
-            auctionTitle: data.bid?.auction?.title
-          });
-          
           toast({
             title: "Payment Verified",
             description: `Your payment of $${data.amount} has been successfully processed.`,
             variant: "default",
           });
-        } else if (data && data.status === 'pending') {
+        } else {
           // If not yet completed, it might still be processing
           toast({
             title: "Payment Processing",
@@ -70,13 +50,6 @@ export default function PaymentSuccess() {
           // Payments are usually processed quickly, but we'll check again in a few seconds
           setTimeout(verifyPayment, 5000);
           return;
-        } else {
-          // If payment not found or has another status
-          toast({
-            title: "Payment Status Unknown",
-            description: "We couldn't verify your payment status. Please check your dashboard later.",
-            variant: "destructive",
-          });
         }
       } catch (error) {
         console.error("Error verifying payment:", error);
@@ -112,20 +85,9 @@ export default function PaymentSuccess() {
               <p className="text-sm text-muted-foreground">Verifying payment status...</p>
             </div>
           ) : (
-            <>
-              {paymentVerified && paymentDetails && (
-                <div className="bg-green-50 p-4 rounded-md border border-green-200">
-                  <h3 className="font-semibold text-green-800">Payment Details:</h3>
-                  <p className="text-green-700">Amount: ${paymentDetails.amount}</p>
-                  {paymentDetails.auctionTitle && (
-                    <p className="text-green-700">Auction: {paymentDetails.auctionTitle}</p>
-                  )}
-                </div>
-              )}
-              <p className="text-center text-muted-foreground">
-                You will receive a confirmation email shortly with the details of your purchase.
-              </p>
-            </>
+            <p className="text-center text-muted-foreground">
+              You will receive a confirmation email shortly with the details of your purchase.
+            </p>
           )}
           <div className="flex justify-center pt-4">
             <Button onClick={() => navigate('/dashboard')}>
