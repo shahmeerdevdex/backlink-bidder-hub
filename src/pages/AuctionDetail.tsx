@@ -63,19 +63,33 @@ export default function AuctionDetail() {
 
   useEffect(() => {
     const updateTopBidders = () => {
-      const uniqueBidders = new Set<string>();
-      const activeBids = bids.filter(bid => bid.status === 'active')
+      // Get only the highest bid from each user
+      const userHighestBids = new Map<string, Bid>();
+      
+      bids.filter(bid => bid.status === 'active').forEach(bid => {
+        if (!userHighestBids.has(bid.user_id) || 
+            userHighestBids.get(bid.user_id)!.amount < bid.amount) {
+          userHighestBids.set(bid.user_id, bid);
+        }
+      });
+      
+      // Sort the highest bids by amount in descending order
+      const highestBids = Array.from(userHighestBids.values())
         .sort((a, b) => b.amount - a.amount);
       
-      for (const bid of activeBids) {
+      // Take the top N bidders based on auction max_spots
+      const uniqueBidders = new Set<string>();
+      for (const bid of highestBids) {
         if (uniqueBidders.size < (auction?.max_spots || 3)) {
           uniqueBidders.add(bid.user_id);
         } else {
           break;
         }
       }
+      
       setTopBidders(uniqueBidders);
     };
+    
     updateTopBidders();
   }, [bids, auction?.max_spots]);
 
@@ -394,6 +408,7 @@ export default function AuctionDetail() {
     (userWinner.status === 'pending_payment' || 
      (isAuctionEnded && topBidders.has(currentUser || '')));
   
+  // Get only the highest bid for the current user
   const userHighestBid = currentUser ? 
     bids.filter(bid => bid.user_id === currentUser && bid.status === 'active')
         .sort((a, b) => b.amount - a.amount)[0] : null;
@@ -571,13 +586,19 @@ export default function AuctionDetail() {
                 {bids.map((bid) => {
                   const isUserInTopSpots = topBidders.has(bid.user_id);
                   const isCurrentUserBid = bid.user_id === currentUser;
+                  
+                  // Determine if this is the user's highest bid
+                  const isUsersHighestBid = isCurrentUserBid && 
+                    (!userHighestBid || bid.amount >= userHighestBid.amount);
+                  
                   const bidStyle = isCurrentUserBid ? 
-                    (isUserInTopSpots ? "bg-green-100" : "bg-red-100") : 
+                    (isUsersHighestBid && isUserInTopSpots ? "bg-green-100" : "bg-red-100") : 
                     "bg-secondary/10";
+                    
                   return (
                     <div key={bid.id} className={`flex justify-between items-center p-2 rounded ${bidStyle}`}>
                       <div className="flex items-center gap-2">
-                        {isCurrentUserBid && (
+                        {isCurrentUserBid && isUsersHighestBid && (
                           isUserInTopSpots ? 
                             <CheckCircle className="w-4 h-4 text-green-600" /> :
                             <XCircle className="w-4 h-4 text-red-600" />
@@ -587,6 +608,9 @@ export default function AuctionDetail() {
                         </span>
                         {isUserInTopSpots && !isCurrentUserBid && (
                           <Badge variant="outline" className="ml-1 text-xs py-0 px-1">Top Bidder</Badge>
+                        )}
+                        {isCurrentUserBid && !isUsersHighestBid && (
+                          <span className="text-xs text-muted-foreground ml-1">Previous bid</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
