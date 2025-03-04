@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
@@ -41,7 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -51,7 +49,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    // Listen for changes on auth state (signed in, signed out, etc.)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
@@ -72,13 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleAuthChange = (event: AuthChangeEvent, user: User | null) => {
     if (event === 'PASSWORD_RECOVERY') {
-      // Handle password recovery
       toast({
         title: "Password Recovery",
         description: "You can now reset your password.",
       });
     } else if (event === 'SIGNED_IN') {
-      // Handle signed in
       if (user && !user.email_confirmed_at) {
         toast({
           title: "Email Not Verified",
@@ -101,13 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
-    } else if (event === 'USER_DELETED') {
-      toast({
-        title: "Account Deleted",
-        description: "Your account has been deleted.",
-      });
     }
-    // Remove the comparison with 'SIGNED_UP' as it's not a valid event type in the latest Supabase auth
   };
 
   const checkAdminStatus = async (userId: string) => {
@@ -122,7 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Add signOut function that uses Supabase's signOut
   const signOut = async () => {
     await supabase.auth.signOut();
   };
