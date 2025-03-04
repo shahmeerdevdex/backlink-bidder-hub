@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,13 +21,10 @@ export default function Auth() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Check if the URL has a hash for password recovery or email verification
   useEffect(() => {
-    // Check if URL contains reset password token
     const hash = window.location.hash;
     if (hash && hash.includes('type=recovery')) {
       setShowResetForm(true);
-      // Extract token from URL if available
       const token = new URLSearchParams(hash.substring(1)).get('access_token');
       if (token) {
         toast({
@@ -38,7 +34,6 @@ export default function Auth() {
       }
     }
     
-    // Check if URL contains email verification success
     if (hash && hash.includes('type=signup')) {
       toast({
         title: "Email Verified",
@@ -47,7 +42,6 @@ export default function Auth() {
     }
   }, [toast]);
 
-  // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
       const from = location.state?.from?.pathname || '/';
@@ -59,7 +53,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     
-    const { error } = await supabase.auth.signUp({
+    const { error, data } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -76,7 +70,7 @@ export default function Auth() {
     } else {
       toast({
         title: "Success!",
-        description: "Please check your email to confirm your account.",
+        description: "Please check your email to confirm your account. Don't forget to check your spam folder.",
       });
       setActiveTab('signin');
     }

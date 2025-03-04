@@ -10,6 +10,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isEmailVerified: boolean;
   signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,7 +18,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isEmailVerified: false,
-  signOut: async () => {}
+  signOut: async () => {},
+  refreshSession: async () => {}
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -26,6 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const { toast } = useToast();
+
+  const refreshSession = async () => {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (data.session) {
+      setUser(data.session.user);
+      setIsEmailVerified(!!data.session.user.email_confirmed_at);
+      if (data.session.user) {
+        checkAdminStatus(data.session.user.id);
+      }
+    }
+  };
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -88,6 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
+    } else if (event === 'SIGNED_UP') {
+      toast({
+        title: "Sign Up Successful",
+        description: "Please check your email to verify your account.",
+      });
     }
   };
 
@@ -109,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isEmailVerified, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isEmailVerified, signOut, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

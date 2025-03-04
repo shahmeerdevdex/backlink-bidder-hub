@@ -1,10 +1,11 @@
 
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,14 +15,16 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
   const { user, loading, isAdmin, isEmailVerified } = useAuth();
   const location = useLocation();
-  const [showVerificationDialog, setShowVerificationDialog] = useState(false);
+  const navigate = useNavigate();
+  const [showVerificationDialog, setShowVerificationDialog] = useState(!isEmailVerified);
   const [resendingEmail, setResendingEmail] = useState(false);
+  const { toast } = useToast();
 
   const handleResendVerification = async () => {
     if (!user?.email) return;
     
     setResendingEmail(true);
-    const { error } = await supabase.auth.resend({
+    const { error, data } = await supabase.auth.resend({
       type: 'signup',
       email: user.email,
     });
@@ -30,9 +33,21 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
     
     if (error) {
       console.error('Error resending verification email:', error);
+      toast({
+        title: "Error",
+        description: "Failed to resend verification email. Please try again.",
+        variant: "destructive",
+      });
     } else {
-      setShowVerificationDialog(false);
+      toast({
+        title: "Email Sent",
+        description: "Verification email has been resent. Please check your inbox and spam folder.",
+      });
     }
+  };
+
+  const handleBackToLogin = () => {
+    navigate('/auth', { replace: true });
   };
 
   if (loading) {
@@ -48,12 +63,12 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
     // Show verification dialog instead of redirecting
     return (
       <>
-        <AlertDialog open={true} onOpenChange={setShowVerificationDialog}>
+        <AlertDialog open={showVerificationDialog} onOpenChange={setShowVerificationDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Email Verification Required</AlertDialogTitle>
               <AlertDialogDescription>
-                Please verify your email address before accessing this page. Check your inbox for a verification link.
+                Please verify your email address before accessing this page. Check your inbox and spam folder for a verification link.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -65,7 +80,7 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
                 {resendingEmail ? 'Sending...' : 'Resend Verification Email'}
               </Button>
               <AlertDialogAction asChild>
-                <Button onClick={() => <Navigate to="/auth" replace />}>
+                <Button onClick={handleBackToLogin}>
                   Back to Login
                 </Button>
               </AlertDialogAction>
