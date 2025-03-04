@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { format } from 'date-fns';
 
@@ -33,6 +34,7 @@ interface Auction {
 export default function AuctionManagement() {
   const [myAuctions, setMyAuctions] = useState<Auction[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
   const [form, setForm] = useState<AuctionForm>({
     title: '',
@@ -73,6 +75,8 @@ export default function AuctionManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    setIsSubmitting(true);
 
     const auctionData = {
       title: form.title,
@@ -151,6 +155,8 @@ export default function AuctionManagement() {
         description: "An unexpected error occurred",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -271,7 +277,16 @@ export default function AuctionManagement() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit">{editingAuction ? "Update Auction" : "Create Auction"}</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {editingAuction ? "Updating..." : "Creating..."}
+                  </>
+                ) : (
+                  editingAuction ? "Update Auction" : "Create Auction"
+                )}
+              </Button>
             </CardFooter>
           </form>
         </Card>
