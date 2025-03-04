@@ -1,7 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { User, AuthChangeEvent } from '@supabase/supabase-js';
+import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
@@ -101,12 +101,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
-    } else if (event === 'SIGNED_UP') {
+    } else if (event === 'USER_DELETED') {
       toast({
-        title: "Sign Up Successful",
-        description: "Please check your email to verify your account.",
+        title: "Account Deleted",
+        description: "Your account has been deleted.",
       });
     }
+    // Remove the comparison with 'SIGNED_UP' as it's not a valid event type in the latest Supabase auth
   };
 
   const checkAdminStatus = async (userId: string) => {
