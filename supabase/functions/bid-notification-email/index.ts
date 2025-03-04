@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     console.log('Raw request body:', requestText)
     
     const requestData = JSON.parse(requestText)
-    const { bidId, auctionId, notifyAllUsers } = requestData
+    let { bidId, auctionId, notifyAllUsers } = requestData
     
     console.log(`Processing notification with: bidId: ${bidId}, auctionId: ${auctionId}, notifyAllUsers: ${notifyAllUsers}`)
     
