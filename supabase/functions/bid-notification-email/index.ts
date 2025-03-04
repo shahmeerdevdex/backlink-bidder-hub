@@ -34,72 +34,124 @@ Deno.serve(async (req) => {
     console.log('Raw request body:', requestText)
     
     const requestData = JSON.parse(requestText)
-    const { bidId, notifyAllUsers } = requestData
+    const { bidId, auctionId, notifyAllUsers } = requestData
     
-    console.log(`Processing notification for bid ID: ${bidId}, notifyAllUsers: ${notifyAllUsers}`)
+    console.log(`Processing notification with: bidId: ${bidId}, auctionId: ${auctionId}, notifyAllUsers: ${notifyAllUsers}`)
     
-    if (!bidId) {
-      console.error('Missing required parameter: bidId')
+    if (!bidId && !auctionId) {
+      console.error('Missing required parameters: either bidId or auctionId must be provided')
       return new Response(
-        JSON.stringify({ error: 'Missing required parameter: bidId' }),
+        JSON.stringify({ error: 'Missing required parameters: either bidId or auctionId must be provided' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Get bid details
-    console.log(`Fetching bid details for ID: ${bidId}`)
-    const { data: bid, error: bidError } = await supabase
-      .from('bids')
-      .select('id, amount, auction_id, user_id, is_initial')
-      .eq('id', bidId)
-      .single()
+    let auction;
+    let bidder;
+    let bidderEmail;
 
-    if (bidError) {
-      console.error(`Error fetching bid: ${bidError.message}`)
-      return new Response(
-        JSON.stringify({ error: `Error fetching bid: ${bidError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // If we have a bid ID, get bid and auction details from it
+    if (bidId) {
+      console.log(`Fetching bid details for ID: ${bidId}`)
+      const { data: bid, error: bidError } = await supabase
+        .from('bids')
+        .select('id, amount, auction_id, user_id, is_initial')
+        .eq('id', bidId)
+        .single()
+
+      if (bidError) {
+        console.error(`Error fetching bid: ${bidError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching bid: ${bidError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log(`Bid data retrieved:`, bid)
+      
+      // Get auction details
+      console.log(`Fetching auction details for ID: ${bid.auction_id}`)
+      const { data: auctionData, error: auctionError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('id', bid.auction_id)
+        .single()
+
+      if (auctionError) {
+        console.error(`Error fetching auction: ${auctionError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching auction: ${auctionError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log(`Auction data retrieved:`, auctionData)
+      auction = auctionData;
+      
+      // Get user details of the bidder
+      console.log(`Fetching user details for ID: ${bid.user_id}`)
+      const { data: bidderData, error: bidderError } = await supabase.auth.admin.getUserById(bid.user_id)
+
+      if (bidderError) {
+        console.error(`Error fetching bidder: ${bidderError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching bidder: ${bidderError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      bidderEmail = bidderData.user?.email || 'Unknown bidder'
+      bidder = bid.user_id;
+      console.log(`Bidder email: ${bidderEmail}`)
+
+      // If this is an initial bid (from auction creation), set notifyAllUsers flag
+      if (bid.is_initial) {
+        console.log('This is an initial bid from auction creation, setting notifyAllUsers to true')
+        notifyAllUsers = true;
+      }
+    } else if (auctionId) {
+      // If we have an auction ID, get auction details directly
+      console.log(`Fetching auction details for ID: ${auctionId}`)
+      const { data: auctionData, error: auctionError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('id', auctionId)
+        .single()
+
+      if (auctionError) {
+        console.error(`Error fetching auction: ${auctionError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching auction: ${auctionError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log(`Auction data retrieved:`, auctionData)
+      auction = auctionData;
+
+      // Get creator details
+      console.log(`Fetching creator details for ID: ${auction.creator_id}`)
+      const { data: creatorData, error: creatorError } = await supabase.auth.admin.getUserById(auction.creator_id)
+
+      if (creatorError) {
+        console.error(`Error fetching creator: ${creatorError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching creator: ${creatorError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      bidderEmail = creatorData.user?.email || 'Unknown creator'
+      bidder = auction.creator_id;
+      console.log(`Creator email: ${bidderEmail}`)
+      
+      // For direct auction notification, always notify all users
+      notifyAllUsers = true;
     }
 
-    console.log(`Bid data retrieved:`, bid)
-    
-    // Get auction details
-    console.log(`Fetching auction details for ID: ${bid.auction_id}`)
-    const { data: auction, error: auctionError } = await supabase
-      .from('auctions')
-      .select('*')
-      .eq('id', bid.auction_id)
-      .single()
-
-    if (auctionError) {
-      console.error(`Error fetching auction: ${auctionError.message}`)
-      return new Response(
-        JSON.stringify({ error: `Error fetching auction: ${auctionError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log(`Auction data retrieved:`, auction)
-    
-    // Get user details of the bidder
-    console.log(`Fetching user details for ID: ${bid.user_id}`)
-    const { data: bidderData, error: bidderError } = await supabase.auth.admin.getUserById(bid.user_id)
-
-    if (bidderError) {
-      console.error(`Error fetching bidder: ${bidderError.message}`)
-      return new Response(
-        JSON.stringify({ error: `Error fetching bidder: ${bidderError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const bidderEmail = bidderData.user?.email || 'Unknown bidder'
-    console.log(`Bidder email: ${bidderEmail}`)
-
-    // If this is an initial bid (from auction creation) or notifyAllUsers is true, notify all users
-    if (bid.is_initial || notifyAllUsers) {
-      console.log('This is an initial bid from auction creation or notifyAllUsers is true, notifying all users')
+    // If notifyAllUsers is true, notify all users
+    if (notifyAllUsers) {
+      console.log('notifyAllUsers is true, notifying all users about the auction')
       
       // Get all users from profiles
       const { data: allProfiles, error: profilesError } = await supabase
@@ -146,14 +198,14 @@ Deno.serve(async (req) => {
             console.log(`Email sent successfully to ${profile.email}, result:`, result)
             
             // Create notification in database for all users except creator
-            if (profile.id !== bid.user_id) {
+            if (profile.id !== bidder) {
               return supabase
                 .from('notifications')
                 .insert({
                   user_id: profile.id,
                   type: 'new_auction',
                   message: `New auction created: ${auction.title}`,
-                  auction_id: bid.auction_id
+                  auction_id: auction.id
                 })
                 .then(({ error: notificationError }) => {
                   if (notificationError) {
@@ -223,13 +275,13 @@ Deno.serve(async (req) => {
     }
 
     // For regular bids, get all unique bidders for this auction (except the current bidder)
-    console.log(`Fetching all bidders for auction ID: ${bid.auction_id}`)
+    console.log(`Fetching all bidders for auction ID: ${auction.id}`)
     const { data: uniqueBidders, error: biddersError } = await supabase
       .from('bids')
       .select('user_id')
-      .eq('auction_id', bid.auction_id)
+      .eq('auction_id', auction.id)
       .eq('status', 'active')
-      .neq('user_id', bid.user_id) // Exclude the current bidder
+      .neq('user_id', bidder) // Exclude the current bidder
       .order('user_id')
 
     if (biddersError) {
@@ -276,7 +328,7 @@ Deno.serve(async (req) => {
         html: `
           <h1>New Bid Alert!</h1>
           <p>A new bid has been placed on the auction: <strong>${auction.title}</strong></p>
-          <p>New bid amount: <strong>$${bid.amount}</strong></p>
+          <p>New bid amount: <strong>$${bidId ? requestData.amount : auction.current_price}</strong></p>
           <p>Auction details:</p>
           <ul>
             <li>Description: ${auction.description}</li>
@@ -296,8 +348,8 @@ Deno.serve(async (req) => {
             .insert({
               user_id: bidderId,
               type: 'new_bid',
-              message: `New bid of $${bid.amount} placed on auction: ${auction.title}`,
-              auction_id: bid.auction_id
+              message: `New bid of $${bidId ? requestData.amount : auction.current_price} placed on auction: ${auction.title}`,
+              auction_id: auction.id
             })
             .then(({ error: notificationError }) => {
               if (notificationError) {

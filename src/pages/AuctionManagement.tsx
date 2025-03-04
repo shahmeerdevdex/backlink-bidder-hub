@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -112,34 +111,18 @@ export default function AuctionManagement() {
       
       if (auctionId && !editingAuction) {
         try {
-          console.log('New auction created. Creating initial bid and sending notification emails for auction ID:', auctionId);
+          console.log('New auction created. Sending notification emails for auction ID:', auctionId);
           
-          const { data: bidData, error: bidError } = await supabase
-            .from('bids')
-            .insert([{
-              auction_id: auctionId,
-              user_id: user.id,
-              amount: parseInt(form.starting_price),
-              status: 'active',
-              is_initial: true
-            }])
-            .select();
-            
-          if (bidError) {
-            console.error('Error creating initial bid:', bidError);
-          } else if (bidData && bidData[0]) {
-            const { data: notificationData, error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
-              body: { 
-                bidId: bidData[0].id,
-                notifyAllUsers: true
-              }
-            });
-
-            if (notificationError) {
-              console.error('Error sending auction creation notifications:', notificationError);
-            } else {
-              console.log('Auction creation notification response:', notificationData);
+          const { data: notificationData, error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
+            body: { 
+              auctionId: auctionId
             }
+          });
+
+          if (notificationError) {
+            console.error('Error sending auction creation notifications:', notificationError);
+          } else {
+            console.log('Auction creation notification response:', notificationData);
           }
         } catch (notificationError) {
           console.error('Failed to invoke bid notification function for new auction:', notificationError);
