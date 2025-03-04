@@ -19,7 +19,7 @@ interface Notification {
   user_id: string;
   type: 'winner' | 'outbid' | 'auction_ending' | 'new_auction';
   message: string;
-  auction_id: string | null;
+  auction_id?: string; // Make auction_id optional
   read: boolean;
   created_at: string;
 }
@@ -59,7 +59,7 @@ export function Notifications() {
         type: (item.type as 'winner' | 'outbid' | 'auction_ending' | 'new_auction'),
         message: item.message,
         // Add auction_id property even if it doesn't exist in the database
-        auction_id: (item as any).auction_id || null,
+        auction_id: (item as any).auction_id,
         read: !!item.read,
         created_at: item.created_at
       }));

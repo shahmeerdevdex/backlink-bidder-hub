@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -78,13 +79,14 @@ interface CompletedAuction {
   }>;
 }
 
+// Update the Notification interface to include optional auction_id
 interface Notification {
   id: string;
   type: string;
   message: string;
   read: boolean;
   created_at: string;
-  auction_id?: string;
+  auction_id?: string; // Make auction_id optional
   user_id: string;
 }
 
@@ -117,18 +119,23 @@ export default function UserDashboard() {
         
       if (error) throw error;
       
-      const typedData = (data || []) as Notification[];
-      setNotifications(typedData);
+      // Process the notifications to ensure the auction_id property is handled correctly
+      const processedData = (data || []).map(notification => ({
+        ...notification,
+        auction_id: (notification as any).auction_id || undefined
+      })) as Notification[];
       
-      typedData.filter(n => !n.read).forEach(notification => {
+      setNotifications(processedData);
+      
+      processedData.filter(n => !n.read).forEach(notification => {
         toast({
           title: notification.type === 'winner' ? 'Auction Won!' : 'Notification',
           description: notification.message,
         });
       });
       
-      if (typedData && typedData.length > 0) {
-        const unreadIds = typedData.filter(n => !n.read).map(n => n.id);
+      if (processedData && processedData.length > 0) {
+        const unreadIds = processedData.filter(n => !n.read).map(n => n.id);
         if (unreadIds.length > 0) {
           await supabase
             .from('notifications')
