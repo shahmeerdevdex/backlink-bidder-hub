@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, Clock, CreditCard, DollarSign, Users, X, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, CreditCard, DollarSign, Users, X, XCircle, Shield } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -397,6 +397,14 @@ export default function AuctionDetail() {
     (userWinner.status === 'pending_payment' || 
      (isAuctionEnded && topBidders.has(currentUser || '')));
   
+  // Get the user's highest active bid
+  const userHighestBid = currentUser ? 
+    bids.filter(bid => bid.user_id === currentUser && bid.status === 'active')
+        .sort((a, b) => b.amount - a.amount)[0] : null;
+  
+  // Check if user has a secure place (their bid is in top spots)
+  const userHasSecurePlace = currentUser && topBidders.has(currentUser);
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <Card className="mb-8">
@@ -420,6 +428,13 @@ export default function AuctionDetail() {
                   You won this auction!
                 </Badge>
               )}
+              
+              {userHasSecurePlace && !isAuctionEnded && (
+                <Badge variant="outline" className="border-green-500 text-green-600 bg-green-50">
+                  <Shield className="w-4 h-4 mr-1" />
+                  Securing a place
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -441,6 +456,14 @@ export default function AuctionDetail() {
                 <DollarSign className="w-4 h-4 mr-2" />
                 Pay Now
               </Button>
+            </div>
+          )}
+
+          {userHasSecurePlace && !isAuctionEnded && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="text-xl font-semibold text-green-700 mb-2">You're currently securing a place!</h3>
+              <p className="mb-2">Your bid is among the top {auction.max_spots} bids right now.</p>
+              <p className="text-sm text-green-700">Keep an eye on the auction as others may place higher bids.</p>
             </div>
           )}
 
@@ -499,6 +522,9 @@ export default function AuctionDetail() {
                         <span className={bid.status === 'cancelled' ? 'text-muted-foreground line-through' : ''}>
                           ${bid.amount}
                         </span>
+                        {isUserInTopSpots && !isCurrentUserBid && (
+                          <Badge variant="outline" className="ml-1 text-xs py-0 px-1">Top Bidder</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">
