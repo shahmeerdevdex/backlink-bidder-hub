@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast({
           title: "Email Not Verified",
           description: "Please check your email to verify your account.",
-          variant: "warning",
+          variant: "destructive", // Changed from "warning" to "destructive"
         });
       } else if (user) {
         toast({

@@ -10,13 +10,13 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Github } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { Textarea } from '@/components/ui/textarea';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [showResetForm, setShowResetForm] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -27,7 +27,7 @@ export default function Auth() {
     // Check if URL contains reset password token
     const hash = window.location.hash;
     if (hash && hash.includes('type=recovery')) {
-      setActiveTab('resetPassword');
+      setShowResetForm(true);
       // Extract token from URL if available
       const token = new URLSearchParams(hash.substring(1)).get('access_token');
       if (token) {
@@ -121,7 +121,7 @@ export default function Auth() {
         title: "Recovery Email Sent",
         description: "Check your email for the password reset link.",
       });
-      setActiveTab('signin');
+      setShowResetForm(false);
     }
     setLoading(false);
   };
@@ -154,6 +154,7 @@ export default function Auth() {
         title: "Password Updated",
         description: "Your password has been successfully updated. You can now sign in.",
       });
+      setShowResetForm(false);
       setActiveTab('signin');
     }
     setLoading(false);
@@ -176,6 +177,82 @@ export default function Auth() {
     }
   };
 
+  const renderPasswordResetForm = () => {
+    if (window.location.hash.includes('type=recovery')) {
+      return (
+        <div className="space-y-4">
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-semibold">Reset Your Password</h2>
+            <p className="text-sm text-muted-foreground">Enter your new password below</p>
+          </div>
+          <form onSubmit={handleUpdatePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Enter your new password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Updating...' : 'Update Password'}
+            </Button>
+            <div className="text-center">
+              <Button variant="link" onClick={() => setShowResetForm(false)}>
+                Back to Sign In
+              </Button>
+            </div>
+          </form>
+        </div>
+      );
+    } else {
+      return (
+        <div className="space-y-4">
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-semibold">Reset Your Password</h2>
+            <p className="text-sm text-muted-foreground">Enter your email to receive a password reset link</p>
+          </div>
+          <form onSubmit={handlePasswordReset} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Email</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Sending...' : 'Send Reset Link'}
+            </Button>
+            <div className="text-center">
+              <Button variant="link" onClick={() => setShowResetForm(false)}>
+                Back to Sign In
+              </Button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+  };
+
+  if (showResetForm || window.location.hash.includes('type=recovery')) {
+    return (
+      <div className="container max-w-md mx-auto px-4 py-16">
+        <Card>
+          <CardContent className="pt-6">
+            {renderPasswordResetForm()}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container max-w-md mx-auto px-4 py-16">
       <Card>
@@ -185,10 +262,9 @@ export default function Auth() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3 mb-8">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              <TabsTrigger value="resetPassword">Reset</TabsTrigger>
             </TabsList>
 
             <TabsContent value="signin">
@@ -222,7 +298,7 @@ export default function Auth() {
                   <Button 
                     variant="link" 
                     type="button" 
-                    onClick={() => setActiveTab('resetPassword')}
+                    onClick={() => setShowResetForm(true)}
                     className="text-sm text-muted-foreground"
                   >
                     Forgot your password?
@@ -258,45 +334,12 @@ export default function Auth() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Signing up...' : 'Sign Up'}
                 </Button>
+                <div className="text-center mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    By signing up, you will need to verify your email before you can sign in.
+                  </p>
+                </div>
               </form>
-            </TabsContent>
-
-            <TabsContent value="resetPassword">
-              {window.location.hash.includes('type=recovery') ? (
-                <form onSubmit={handleUpdatePassword} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      placeholder="Enter your new password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Updating...' : 'Update Password'}
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={handlePasswordReset} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="reset-email">Email</Label>
-                    <Input
-                      id="reset-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Sending...' : 'Send Reset Link'}
-                  </Button>
-                </form>
-              )}
             </TabsContent>
           </Tabs>
 
