@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/AuthProvider';
@@ -44,6 +43,7 @@ interface AuctionWinner {
   status: string;
   payment_deadline: string;
   auction_title?: string; // Add auction title
+  winning_amount: number;
   // Add other properties as needed
 }
 
@@ -115,18 +115,23 @@ export default function UserDashboard() {
             *,
             auctions:auction_id (
               title
+            ),
+            bids:winning_bid_id (
+              amount
             )
           `)
           .eq('user_id', user.id);
 
         if (winnersError) throw winnersError;
         
-        // Process winners data to include auction title
+        // Process winners data to include auction title and bid amount
         const processedWinners = (winnersData || []).map(winner => ({
           ...winner,
-          auction_title: winner.auctions?.title || 'Unknown Auction'
+          auction_title: winner.auctions?.title || 'Unknown Auction',
+          winning_amount: winner.bids?.amount || 0
         }));
         
+        console.log("Won auctions:", processedWinners);
         setWonAuctions(processedWinners);
       } catch (error: any) {
         console.error('Error fetching data:', error);
@@ -317,6 +322,7 @@ export default function UserDashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Auction</TableHead>
+                      <TableHead>Winning Bid</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment Deadline</TableHead>
                       <TableHead>Actions</TableHead>
@@ -328,6 +334,11 @@ export default function UserDashboard() {
                         <TableRow key={winner.id}>
                           <TableCell className="font-medium">
                             {winner.auction_title}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-green-50 text-green-800 border-green-300">
+                              ${winner.winning_amount}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge 
@@ -357,7 +368,7 @@ export default function UserDashboard() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                           You haven't won any auctions yet.
                         </TableCell>
                       </TableRow>
