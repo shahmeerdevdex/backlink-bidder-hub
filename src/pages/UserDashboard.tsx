@@ -7,7 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowRight, Clock, DollarSign } from 'lucide-react';
+import { ArrowRight, Clock, DollarSign, Tag, Calendar, User, Award } from 'lucide-react';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Auction {
   id: string;
@@ -165,23 +174,30 @@ export default function UserDashboard() {
       <h1 className="text-3xl font-semibold mb-5">User Dashboard</h1>
 
       <Tabs defaultValue="activeAuctions" className="w-full">
-        <TabsList>
+        <TabsList className="mb-4">
           <TabsTrigger value="activeAuctions">Active Auctions</TabsTrigger>
           <TabsTrigger value="myBids">My Bids</TabsTrigger>
           <TabsTrigger value="wonAuctions">Won Auctions</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
+        
         <TabsContent value="activeAuctions" className="mt-5">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeAuctions.map((auction) => (
-              <Card key={auction.id}>
+              <Card key={auction.id} className="h-full">
                 <CardHeader>
                   <CardTitle>{auction.title}</CardTitle>
                   <CardDescription>{auction.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p>Current Price: ${auction.current_price}</p>
-                  <p>Ends At: {new Date(auction.ends_at).toLocaleString()}</p>
+                  <p className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-4 w-4 text-green-500" />
+                    <span>Current Price: ${auction.current_price}</span>
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                    <span>Ends At: {new Date(auction.ends_at).toLocaleString()}</span>
+                  </p>
                 </CardContent>
                 <CardFooter>
                   <Button onClick={() => navigate(`/auctions/${auction.id}`)}>
@@ -190,48 +206,142 @@ export default function UserDashboard() {
                 </CardFooter>
               </Card>
             ))}
+            {activeAuctions.length === 0 && (
+              <div className="col-span-full text-center py-10">
+                <p className="text-gray-500">You don't have any active auctions.</p>
+              </div>
+            )}
           </div>
         </TabsContent>
+
         <TabsContent value="myBids" className="mt-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {userBids.map((bid) => (
-              <Card key={bid.id}>
-                <CardHeader>
-                  <CardTitle>Bid on Auction ID: {bid.auction_id}</CardTitle>
-                  <CardDescription>Placed on: {new Date(bid.created_at).toLocaleString()}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>Amount: ${bid.amount}</p>
-                </CardContent>
-                <CardFooter>
-                  <Button onClick={() => navigate(`/auctions/${bid.auction_id}`)}>
-                    View Auction <ArrowRight className="ml-2" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>My Bids</CardTitle>
+              <CardDescription>
+                Bids you've placed across various auctions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px] rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Auction</TableHead>
+                      <TableHead>Bid Amount</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userBids.length > 0 ? (
+                      userBids.map((bid) => (
+                        <TableRow key={bid.id}>
+                          <TableCell className="font-medium">
+                            Auction #{bid.auction_id.substring(0, 8)}...
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              ${bid.amount}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(bid.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => navigate(`/auctions/${bid.auction_id}`)}
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                          You haven't placed any bids yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </TabsContent>
+
         <TabsContent value="wonAuctions" className="mt-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {wonAuctions.map((winner) => (
-              <Card key={winner.id}>
-                <CardHeader>
-                  <CardTitle>Won Auction ID: {winner.auction_id}</CardTitle>
-                  <CardDescription>Payment Deadline: {new Date(winner.payment_deadline).toLocaleString()}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>Status: {winner.status}</p>
-                </CardContent>
-                <CardFooter>
-                  <Button onClick={() => navigate(`/auctions/${winner.auction_id}`)}>
-                    View Auction <ArrowRight className="ml-2" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-amber-500" />
+                Won Auctions
+              </CardTitle>
+              <CardDescription>
+                Auctions you've successfully won
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px] rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Auction ID</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Payment Deadline</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {wonAuctions.length > 0 ? (
+                      wonAuctions.map((winner) => (
+                        <TableRow key={winner.id}>
+                          <TableCell className="font-medium">
+                            {winner.auction_id.substring(0, 8)}...
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={winner.status === 'paid' ? 'outline' : 'secondary'}
+                              className={
+                                winner.status === 'paid' 
+                                  ? 'bg-green-100 text-green-800 border-green-300' 
+                                  : 'bg-amber-100 text-amber-800 border-amber-300'
+                              }
+                            >
+                              {winner.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(winner.payment_deadline).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => navigate(`/auctions/${winner.auction_id}`)}
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                          You haven't won any auctions yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </TabsContent>
+
         <TabsContent value="notifications" className="mt-5">
           <div className="grid grid-cols-1 gap-4">
             {notifications.map((notification) => (
@@ -256,6 +366,11 @@ export default function UserDashboard() {
                 </CardFooter>
               </Card>
             ))}
+            {notifications.length === 0 && (
+              <div className="text-center py-10">
+                <p className="text-gray-500">You don't have any notifications.</p>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
