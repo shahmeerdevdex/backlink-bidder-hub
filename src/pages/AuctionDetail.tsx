@@ -491,7 +491,7 @@ export default function AuctionDetail() {
             <div className="flex flex-col items-end gap-2">
               <Badge variant="secondary">
                 <Users className="w-4 h-4 mr-1" />
-                {auction.filled_spots}/{auction.max_spots} spots
+                {auction.max_spots} spots
               </Badge>
               
               {isAuctionEnded && (
