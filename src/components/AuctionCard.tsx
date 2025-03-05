@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -106,6 +107,9 @@ export function AuctionCard({
 
     if (filledSpots >= maxSpots - 1) {
       try {
+        // Add debug logging
+        console.log('Calling disable-spot-check function for auction:', id);
+        
         const { error } = await supabase.functions.invoke('disable-spot-check');
         
         if (error) {
@@ -118,6 +122,7 @@ export function AuctionCard({
           return;
         }
         
+        console.log('Successfully disabled spot check trigger');
         toast({
           title: "Bidding enabled",
           description: "You can now place your bid even if the auction is full.",
