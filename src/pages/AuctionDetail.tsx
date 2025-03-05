@@ -648,6 +648,16 @@ export default function AuctionDetail() {
                     (isUsersHighestBid && isUserInTopSpots ? "bg-green-100" : "bg-red-100") : 
                     "bg-secondary/10";
                     
+                  const userBids = bids.filter(b => 
+                    b.user_id === bid.user_id && 
+                    b.status === 'active'
+                  );
+                  
+                  const isUsersTopBid = userBids.length > 0 && 
+                    bid.amount === Math.max(...userBids.map(b => b.amount));
+                  
+                  const showTopBidderBadge = isUserInTopSpots && isUsersTopBid;
+                  
                   return (
                     <div key={bid.id} className={`flex justify-between items-center p-2 rounded ${bidStyle}`}>
                       <div className="flex items-center gap-2">
@@ -659,7 +669,7 @@ export default function AuctionDetail() {
                         <span className={bid.status === 'cancelled' ? 'text-muted-foreground line-through' : ''}>
                           ${bid.amount}
                         </span>
-                        {isUserInTopSpots && !isCurrentUserBid && (
+                        {showTopBidderBadge && (
                           <Badge variant="outline" className="ml-1 text-xs py-0 px-1">Top Bidder</Badge>
                         )}
                         {isCurrentUserBid && !isUsersHighestBid && (
