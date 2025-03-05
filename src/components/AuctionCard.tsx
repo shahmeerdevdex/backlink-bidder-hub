@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -125,6 +124,7 @@ export function AuctionCard({
         toast({
           title: "Bidding enabled",
           description: "You can now place your bid even if the auction is full.",
+          // Fix: Change from string literal "default" to the correct union type
           variant: "default",
         });
       } catch (error) {
