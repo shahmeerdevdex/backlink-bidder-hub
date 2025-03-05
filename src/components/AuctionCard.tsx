@@ -109,8 +109,8 @@ export function AuctionCard({
   };
 
   const getSpotsBadgeVariant = () => {
-    if (filledSpots >= maxSpots) return "default";
-    if (filledSpots >= maxSpots * 0.8) return "default";
+    if (filledSpots >= maxSpots) return "secondary";
+    if (filledSpots >= maxSpots * 0.8) return "secondary";
     return "secondary";
   };
 
