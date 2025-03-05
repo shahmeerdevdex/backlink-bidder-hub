@@ -117,7 +117,7 @@ export function AuctionCard({
           toast({
             title: "Error",
             description: "There was an error preparing your bid. Please try again.",
-            variant: "destructive",
+            variant: "destructive", 
           });
           return;
         }
@@ -126,7 +126,7 @@ export function AuctionCard({
         toast({
           title: "Bidding enabled",
           description: "You can now place your bid even if the auction is full.",
-          variant: "default",
+          variant: "default", 
         });
       } catch (error) {
         console.error('Error invoking function:', error);
