@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -105,10 +104,8 @@ export function AuctionCard({
       return;
     }
 
-    // Check if we're approaching the max spots limit and need to disable the check
     if (filledSpots >= maxSpots - 1) {
       try {
-        // Call the edge function to disable the spot check trigger
         const { error } = await supabase.functions.invoke('disable-spot-check');
         
         if (error) {
@@ -121,11 +118,10 @@ export function AuctionCard({
           return;
         }
         
-        // Proceed with the bid after disabling the check
         toast({
           title: "Bidding enabled",
           description: "You can now place your bid even if the auction is full.",
-          variant: "default",  // Fixed: Using the correct union type instead of string literal
+          variant: "default",
         });
       } catch (error) {
         console.error('Error invoking function:', error);
