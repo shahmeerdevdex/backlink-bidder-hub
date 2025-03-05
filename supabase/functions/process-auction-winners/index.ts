@@ -76,64 +76,54 @@ serve(async (req) => {
           .update({ status: "completed" })
           .eq("id", auction.id);
 
-        // Find all unique bidders for this auction
-        const { data: uniqueBidders, error: uniqueBiddersError } = await supabaseClient
+        // Get all active bids for this auction
+        const { data: allBids, error: bidsError } = await supabaseClient
           .from("bids")
-          .select("user_id")
+          .select("id, user_id, amount")
           .eq("auction_id", auction.id)
           .eq("status", "active")
-          .order("amount", { ascending: false })
-          .not("user_id", "is", null);
+          .order("amount", { ascending: false });
 
-        if (uniqueBiddersError) {
-          throw new Error(`Error fetching unique bidders: ${uniqueBiddersError.message}`);
+        if (bidsError) {
+          throw new Error(`Error fetching bids: ${bidsError.message}`);
         }
 
-        // Extract unique user IDs
-        const uniqueUserIds = [...new Set(uniqueBidders?.map(bid => bid.user_id))];
-        console.log(`Found ${uniqueUserIds.length} unique bidders for auction ${auction.id}`);
+        console.log(`Found ${allBids?.length || 0} active bids for auction ${auction.id}`);
 
-        // Limit to max_spots
+        // Group bids by user and take only the highest bid per user
+        const userHighestBids = new Map();
+        allBids?.forEach(bid => {
+          if (!userHighestBids.has(bid.user_id) || 
+              userHighestBids.get(bid.user_id).amount < bid.amount) {
+            userHighestBids.set(bid.user_id, bid);
+          }
+        });
+
+        // Sort users by their highest bid amounts
+        const sortedBids = Array.from(userHighestBids.values())
+          .sort((a, b) => b.amount - a.amount);
+        
+        // Take only the top N users (where N is max_spots)
         const maxSpots = auction.max_spots || 3;
-        const eligibleUserIds = uniqueUserIds.slice(0, maxSpots);
-        console.log(`Selected ${eligibleUserIds.length} winners out of ${maxSpots} max spots`);
+        const topBidders = sortedBids.slice(0, maxSpots);
 
-        // For each eligible user, find their highest bid
+        console.log(`Selected ${topBidders.length} winners out of ${maxSpots} max spots`);
+
+        // Process each winner
         const winners = await Promise.all(
-          eligibleUserIds.map(async (userId) => {
-            // Find the highest bid for this user
-            const { data: highestBid, error: bidError } = await supabaseClient
-              .from("bids")
-              .select("id, amount")
-              .eq("auction_id", auction.id)
-              .eq("user_id", userId)
-              .eq("status", "active")
-              .order("amount", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            if (bidError) {
-              console.error(`Error finding highest bid for user ${userId}: ${bidError.message}`);
-              return null;
-            }
-
-            if (!highestBid) {
-              console.log(`No qualifying bid found for user ${userId}`);
-              return null;
-            }
-
-            console.log(`Processing highest bid ${highestBid.id} from user ${userId} with amount ${highestBid.amount}`);
+          topBidders.map(async (bid) => {
+            console.log(`Processing winner user ${bid.user_id} with highest bid ${bid.id} amount ${bid.amount}`);
             
             // Check if this user is already a winner for this auction
             const { data: existingWinner } = await supabaseClient
               .from("auction_winners")
               .select("id")
               .eq("auction_id", auction.id)
-              .eq("user_id", userId)
+              .eq("user_id", bid.user_id)
               .maybeSingle();
 
             if (existingWinner) {
-              console.log(`User ${userId} is already a winner for auction ${auction.id}, skipping`);
+              console.log(`User ${bid.user_id} is already a winner for auction ${auction.id}, skipping`);
               return existingWinner;
             }
 
@@ -146,8 +136,8 @@ serve(async (req) => {
               .from("auction_winners")
               .insert({
                 auction_id: auction.id,
-                user_id: userId,
-                winning_bid_id: highestBid.id,
+                user_id: bid.user_id,
+                winning_bid_id: bid.id,
                 payment_deadline: deadline.toISOString(),
                 status: "pending_payment"
               })
@@ -159,15 +149,15 @@ serve(async (req) => {
               return null;
             }
 
-            console.log(`Created winner record for user ${userId} in auction ${auction.id}`);
+            console.log(`Created winner record for user ${bid.user_id} in auction ${auction.id}`);
 
             // Create notification for winner
             await supabaseClient
               .from("notifications")
               .insert({
-                user_id: userId,
+                user_id: bid.user_id,
                 type: "winner",
-                message: `You've won the auction: ${auction.title} with a bid of $${highestBid.amount}`,
+                message: `You've won the auction: ${auction.title} with a bid of $${bid.amount}`,
                 auction_id: auction.id
               });
 
@@ -188,7 +178,7 @@ serve(async (req) => {
                 const errorData = await emailResponse.json();
                 console.error(`Error response from send-winner-email:`, errorData);
               } else {
-                console.log(`Email notification sent for winner ${userId}`);
+                console.log(`Email notification sent for winner ${bid.user_id}`);
               }
             } catch (emailError) {
               console.error(`Error sending winner email: ${emailError}`);

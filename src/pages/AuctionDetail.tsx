@@ -342,15 +342,6 @@ export default function AuctionDetail() {
         .single();
 
       if (error) {
-        if (error.message.includes('Maximum number of spots reached')) {
-          toast({
-            title: "Cannot place bid",
-            description: "This auction has reached its maximum number of participants",
-            variant: "destructive",
-          });
-          return;
-        }
-
         toast({
           title: "Error placing bid",
           description: error.message,
@@ -586,7 +577,7 @@ export default function AuctionDetail() {
           {currentUser && !userHasBidsButNotWinning && !userHasSecurePlace && !isUserEligibleToPay && !isAuctionEnded && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h3 className="text-xl font-semibold text-blue-700 mb-2">Place a bid to secure your spot!</h3>
-              <p className="mb-4">You haven't placed any bids yet. Place a bid now to secure one of the {auction.max_spots} available spots.</p>
+              <p className="mb-4">Place a bid now to try to secure one of the {auction.max_spots} available spots.</p>
               <div className="flex gap-4">
                 <Input
                   type="number"

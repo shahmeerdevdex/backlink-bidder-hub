@@ -160,7 +160,7 @@ export function AuctionCard({
           disabled={isExpired}
           variant={isExpired ? "outline" : "default"}
         >
-          {isExpired ? 'Auction Ended' : filledSpots >= maxSpots ? 'Bid to Compete' : 'Place Bid'}
+          {isExpired ? 'Auction Ended' : filledSpots >= maxSpots ? 'Place Bid' : 'Place Bid'}
         </Button>
       </CardFooter>
     </Card>
