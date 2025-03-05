@@ -348,7 +348,6 @@ export default function AuctionDetail() {
         return;
       }
 
-      // Send email notifications to all bidders
       try {
         console.log('Invoking bid-notification-email function with bid ID:', data.id);
         const { data: notificationData, error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
