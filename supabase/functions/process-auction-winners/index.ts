@@ -83,7 +83,7 @@ serve(async (req) => {
           .eq("auction_id", auction.id)
           .eq("status", "active")
           .order("amount", { ascending: false })
-          .is("user_id", "not.null");
+          .not("user_id", "is", null);
 
         if (uniqueBiddersError) {
           throw new Error(`Error fetching unique bidders: ${uniqueBiddersError.message}`);
