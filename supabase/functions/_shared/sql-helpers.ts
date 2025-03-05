@@ -17,7 +17,12 @@ DO $$
 BEGIN
   -- Check if the trigger exists before trying to disable it
   IF EXISTS (
-    SELECT 1 FROM pg_trigger WHERE tgname = 'check_auction_spots_trigger'
+    SELECT 1 FROM pg_trigger 
+    JOIN pg_class ON pg_trigger.tgrelid = pg_class.oid
+    JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid
+    WHERE tgname = 'check_auction_spots_trigger'
+    AND pg_namespace.nspname = 'public'
+    AND pg_class.relname = 'bids'
   ) THEN
     ALTER TABLE public.bids DISABLE TRIGGER check_auction_spots_trigger;
   END IF;
@@ -29,7 +34,12 @@ DO $$
 BEGIN
   -- Check if the trigger exists before trying to enable it
   IF EXISTS (
-    SELECT 1 FROM pg_trigger WHERE tgname = 'check_auction_spots_trigger'
+    SELECT 1 FROM pg_trigger 
+    JOIN pg_class ON pg_trigger.tgrelid = pg_class.oid
+    JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid
+    WHERE tgname = 'check_auction_spots_trigger'
+    AND pg_namespace.nspname = 'public'
+    AND pg_class.relname = 'bids'
   ) THEN
     ALTER TABLE public.bids ENABLE TRIGGER check_auction_spots_trigger;
   END IF;
