@@ -13,9 +13,25 @@ WHERE tgname = 'check_auction_spots_trigger';
 `;
 
 export const SQL_DISABLE_TRIGGER = `
-ALTER TABLE public.bids DISABLE TRIGGER IF EXISTS check_auction_spots_trigger;
+DO $$
+BEGIN
+  -- Check if the trigger exists before trying to disable it
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'check_auction_spots_trigger'
+  ) THEN
+    ALTER TABLE public.bids DISABLE TRIGGER check_auction_spots_trigger;
+  END IF;
+END $$;
 `;
 
 export const SQL_ENABLE_TRIGGER = `
-ALTER TABLE public.bids ENABLE TRIGGER IF EXISTS check_auction_spots_trigger;
+DO $$
+BEGIN
+  -- Check if the trigger exists before trying to enable it
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'check_auction_spots_trigger'
+  ) THEN
+    ALTER TABLE public.bids ENABLE TRIGGER check_auction_spots_trigger;
+  END IF;
+END $$;
 `;

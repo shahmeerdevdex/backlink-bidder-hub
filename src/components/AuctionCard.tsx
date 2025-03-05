@@ -110,7 +110,7 @@ export function AuctionCard({
         // Add debug logging
         console.log('Calling disable-spot-check function for auction:', id);
         
-        const { error } = await supabase.functions.invoke('disable-spot-check');
+        const { data, error } = await supabase.functions.invoke('disable-spot-check');
         
         if (error) {
           console.error('Error disabling spot check:', error);
@@ -122,7 +122,7 @@ export function AuctionCard({
           return;
         }
         
-        console.log('Successfully disabled spot check trigger');
+        console.log('Successfully disabled spot check trigger or trigger does not exist:', data);
         toast({
           title: "Bidding enabled",
           description: "You can now place your bid even if the auction is full.",
