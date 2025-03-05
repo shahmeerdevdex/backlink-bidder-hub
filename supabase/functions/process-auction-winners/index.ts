@@ -39,7 +39,6 @@ serve(async (req) => {
     const auctionQuery = supabaseClient
       .from("auctions")
       .select("id, title, max_spots")
-      .eq("status", "active")
       .lt("ends_at", new Date().toISOString());
     
     // If a specific auction ID was provided, add it to the query
