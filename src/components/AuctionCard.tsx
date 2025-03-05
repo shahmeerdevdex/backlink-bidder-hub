@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +6,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { Clock, Users, Mail } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 
 type Auction = Database['public']['Tables']['auctions']['Row'];
@@ -43,7 +41,6 @@ export function AuctionCard({
   const isExpired = new Date(endsAt) <= new Date();
 
   useEffect(() => {
-    // Check if winner notifications have been sent
     const checkWinnerNotifications = async () => {
       if (isExpired) {
         const { data: winners } = await supabase
@@ -60,7 +57,6 @@ export function AuctionCard({
   }, [id, isExpired]);
 
   useEffect(() => {
-    // Subscribe to auction updates
     const channel = supabase
       .channel(`auction-card-${id}`)
       .on<Auction>(
@@ -112,7 +108,7 @@ export function AuctionCard({
   };
 
   const getSpotsBadgeVariant = () => {
-    if (filledSpots >= maxSpots) return "secondary";
+    if (filledSpots >= maxSpots) return "default";
     if (filledSpots >= maxSpots * 0.8) return "default";
     return "secondary";
   };
@@ -160,7 +156,7 @@ export function AuctionCard({
           disabled={isExpired}
           variant={isExpired ? "outline" : "default"}
         >
-          {isExpired ? 'Auction Ended' : filledSpots >= maxSpots ? 'Place Bid' : 'Place Bid'}
+          {isExpired ? 'Auction Ended' : 'Place Bid'}
         </Button>
       </CardFooter>
     </Card>
