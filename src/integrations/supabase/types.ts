@@ -284,6 +284,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_disable_check_auction_spots_trigger: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       create_notification: {
         Args: {
           p_user_id: string

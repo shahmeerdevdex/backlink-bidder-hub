@@ -95,7 +95,7 @@ export function AuctionCard({
     return () => clearInterval(interval);
   }, [endsAt]);
 
-  const handleBidClick = () => {
+  const handleBidClick = async () => {
     if (isExpired) {
       toast({
         title: "Auction ended",
@@ -103,6 +103,39 @@ export function AuctionCard({
         variant: "destructive",
       });
       return;
+    }
+
+    // Check if we're approaching the max spots limit and need to disable the check
+    if (filledSpots >= maxSpots - 1) {
+      try {
+        // Call the edge function to disable the spot check trigger
+        const { error } = await supabase.functions.invoke('disable-spot-check');
+        
+        if (error) {
+          console.error('Error disabling spot check:', error);
+          toast({
+            title: "Error",
+            description: "There was an error preparing your bid. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Proceed with the bid after disabling the check
+        toast({
+          title: "Bidding enabled",
+          description: "You can now place your bid even if the auction is full.",
+          variant: "default",
+        });
+      } catch (error) {
+        console.error('Error invoking function:', error);
+        toast({
+          title: "Error",
+          description: "There was an error preparing your bid. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     onBidClick();
