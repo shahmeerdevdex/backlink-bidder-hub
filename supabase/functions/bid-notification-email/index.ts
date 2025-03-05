@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       console.log(`Fetching bid details for ID: ${bidId}`)
       const { data: bid, error: bidError } = await supabase
         .from('bids')
-        .select('id, amount, auction_id, user_id, is_initial')
+        .select('id, amount, auction_id, user_id')
         .eq('id', bidId)
         .single()
 
@@ -110,9 +110,9 @@ Deno.serve(async (req) => {
       bidder = bid.user_id;
       console.log(`Bidder email: ${bidderEmail}`)
 
-      // If this is an initial bid (from auction creation), set notifyAllUsers flag
-      if (bid.is_initial) {
-        console.log('This is an initial bid from auction creation, setting notifyAllUsers to true')
+      // Check if this is the first bid in the auction (created by auction creator)
+      if (bid.user_id === auction.creator_id && !notifyAllUsers) {
+        console.log('This is a bid by the auction creator, setting notifyAllUsers to true')
         notifyAllUsers = true;
       }
     } else if (auctionId) {
