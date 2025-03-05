@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, Clock, CreditCard, DollarSign, Users, X, XCircle, Shield, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Clock, DollarSign, Users, X, XCircle, Shield, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -52,6 +52,7 @@ export default function AuctionDetail() {
   const [isSendingEmails, setIsSendingEmails] = useState<boolean>(false);
   const [userWinner, setUserWinner] = useState<AuctionWinner | null>(null);
   const [isAuctionEnded, setIsAuctionEnded] = useState<boolean>(false);
+  const [userLostAuction, setUserLostAuction] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -64,7 +65,7 @@ export default function AuctionDetail() {
   useEffect(() => {
     const updateTopBidders = () => {
       const userHighestBids = new Map<string, Bid>();
-      
+
       bids.filter(bid => bid.status === 'active').forEach(bid => {
         if (!userHighestBids.has(bid.user_id) || 
             userHighestBids.get(bid.user_id)!.amount < bid.amount) {
@@ -84,7 +85,7 @@ export default function AuctionDetail() {
       
       setTopBidders(topBidderIds);
     };
-    
+
     updateTopBidders();
   }, [bids, auction?.max_spots]);
 
@@ -266,7 +267,6 @@ export default function AuctionDetail() {
           
           setAuction(prev => prev ? {...prev, winners_processed: true, status: 'completed'} : null);
           
-          // Refresh user winner status if the current user participated
           if (user) {
             const { data: winnerData } = await supabase
               .from('auction_winners')
@@ -295,6 +295,17 @@ export default function AuctionDetail() {
       processAuctionWinners();
     }
   }, [auction, emailsSent, toast, isSendingEmails, user]);
+
+  useEffect(() => {
+    if (isAuctionEnded && emailsSent && currentUser && 
+        bids.some(bid => bid.user_id === currentUser && bid.status === 'active') && 
+        !topBidders.has(currentUser) && 
+        !userWinner) {
+      setUserLostAuction(true);
+    } else {
+      setUserLostAuction(false);
+    }
+  }, [isAuctionEnded, emailsSent, bids, currentUser, topBidders, userWinner]);
 
   const handleBid = async () => {
     if (!auction || !currentUser) {
@@ -365,7 +376,6 @@ export default function AuctionDetail() {
           console.log('Notification response:', notificationData);
         }
         
-        // Send specific outbid notification if someone was outbid
         if (outbidUserId) {
           console.log('Sending outbid notification to user:', outbidUserId);
           
@@ -518,6 +528,20 @@ export default function AuctionDetail() {
         </CardHeader>
         <CardContent>
           <p className="text-lg mb-6">{auction.description}</p>
+
+          {userLostAuction && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <h3 className="text-xl font-semibold text-red-700 mb-2">You didn't win this auction</h3>
+              <p className="mb-2">Unfortunately, your bids were not high enough to secure a spot in this auction.</p>
+              <p className="text-sm text-red-700">Check out other auctions that are still available.</p>
+              <Button 
+                onClick={() => navigate('/')}
+                className="mt-4 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Browse Other Auctions
+              </Button>
+            </div>
+          )}
 
           {isUserEligibleToPay && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
