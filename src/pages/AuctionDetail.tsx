@@ -479,6 +479,11 @@ export default function AuctionDetail() {
     bids.some(bid => bid.user_id === currentUser && bid.status === 'active') && 
     !topBidders.has(currentUser);
   
+  const minimumBidToWin = bids.filter(bid => bid.status === 'active')
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, auction.max_spots)
+      .pop()?.amount || auction.current_price;
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <Card className="mb-8">
@@ -486,7 +491,7 @@ export default function AuctionDetail() {
           <div className="flex justify-between items-start mb-4">
             <CardTitle className="text-3xl font-bold">{auction.title}</CardTitle>
             <div className="flex flex-col items-end gap-2">
-              <Badge variant={auction.filled_spots >= auction.max_spots ? "destructive" : "secondary"}>
+              <Badge variant="secondary">
                 <Users className="w-4 h-4 mr-1" />
                 {auction.filled_spots}/{auction.max_spots} spots
               </Badge>
@@ -558,12 +563,7 @@ export default function AuctionDetail() {
               {userHighestBid && (
                 <div className="text-sm bg-white p-2 rounded mb-4">
                   <p>Your highest bid: <strong>${userHighestBid.amount}</strong></p>
-                  <p>Current minimum winning bid: <strong>${
-                    bids.filter(bid => bid.status === 'active')
-                        .sort((a, b) => b.amount - a.amount)
-                        .slice(0, auction.max_spots)
-                        .pop()?.amount || auction.current_price
-                  }</strong></p>
+                  <p>Current minimum winning bid: <strong>${minimumBidToWin}</strong></p>
                 </div>
               )}
               <Input
@@ -595,10 +595,7 @@ export default function AuctionDetail() {
                   onChange={(e) => setBidAmount(e.target.value)}
                   min={auction.current_price + 1}
                 />
-                <Button 
-                  onClick={handleBid}
-                  disabled={auction.filled_spots >= auction.max_spots || !currentUser}
-                >
+                <Button onClick={handleBid}>
                   Place Bid
                 </Button>
               </div>
@@ -629,10 +626,7 @@ export default function AuctionDetail() {
                       onChange={(e) => setBidAmount(e.target.value)}
                       min={auction.current_price + 1}
                     />
-                    <Button 
-                      onClick={handleBid}
-                      disabled={auction.filled_spots >= auction.max_spots || !currentUser}
-                    >
+                    <Button onClick={handleBid}>
                       Place Bid
                     </Button>
                   </div>

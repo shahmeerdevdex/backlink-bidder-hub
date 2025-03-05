@@ -40,7 +40,6 @@ export function AuctionCard({
   const [filledSpots, setFilledSpots] = useState(initialFilledSpots);
   const [hasWinnerNotification, setHasWinnerNotification] = useState(false);
   const { toast } = useToast();
-  const isFullyBooked = filledSpots >= maxSpots;
   const isExpired = new Date(endsAt) <= new Date();
 
   useEffect(() => {
@@ -100,15 +99,6 @@ export function AuctionCard({
   }, [endsAt]);
 
   const handleBidClick = () => {
-    if (isFullyBooked) {
-      toast({
-        title: "No spots available",
-        description: "This auction has reached its maximum number of spots.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (isExpired) {
       toast({
         title: "Auction ended",
@@ -122,7 +112,7 @@ export function AuctionCard({
   };
 
   const getSpotsBadgeVariant = () => {
-    if (isFullyBooked) return "destructive";
+    if (filledSpots >= maxSpots) return "secondary";
     if (filledSpots >= maxSpots * 0.8) return "default";
     return "secondary";
   };
@@ -167,10 +157,10 @@ export function AuctionCard({
         <Button 
           className="w-full" 
           onClick={handleBidClick}
-          disabled={isFullyBooked || isExpired}
+          disabled={isExpired}
           variant={isExpired ? "outline" : "default"}
         >
-          {isFullyBooked ? 'Fully Booked' : isExpired ? 'Auction Ended' : 'Place Bid'}
+          {isExpired ? 'Auction Ended' : filledSpots >= maxSpots ? 'Bid to Compete' : 'Place Bid'}
         </Button>
       </CardFooter>
     </Card>
