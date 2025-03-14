@@ -44,29 +44,58 @@ export default function PasswordRecovery() {
 
   // Check URL parameters for password reset
   useEffect(() => {
-    // Get the full URL including hash
-    const fullUrl = window.location.href;
+    console.log("Checking for recovery token...");
     
-    // Check for password reset token
-    if (fullUrl.includes('type=recovery')) {
-      console.log("Recovery link detected, showing password reset form");
+    // First check if we have state passed from Auth.tsx
+    if (location.state?.type === 'recovery' && location.state?.token) {
+      console.log("Recovery token found in location state");
       setIsRecoveryFlow(true);
       toast({
         title: "Password Reset",
         description: "Please enter your new password.",
       });
-    } else {
-      // If no recovery token, show the request reset email form
-      setIsRecoveryFlow(false);
+      return;
     }
-  }, [toast]);
+    
+    // If not in state, check URL parameters directly
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const type = params.get('type');
+    
+    if (type === 'recovery' && token) {
+      console.log("Recovery token found in URL parameters:", token);
+      setIsRecoveryFlow(true);
+      toast({
+        title: "Password Reset",
+        description: "Please enter your new password.",
+      });
+      return;
+    }
+    
+    // As a fallback, check for hash parameters
+    const hash = window.location.hash.substring(1);
+    const hashParams = new URLSearchParams(hash);
+    if (hashParams.get('type') === 'recovery') {
+      console.log("Recovery flow detected from hash");
+      setIsRecoveryFlow(true);
+      toast({
+        title: "Password Reset",
+        description: "Please enter your new password.",
+      });
+      return;
+    }
+    
+    // If no recovery parameters found, show the request reset email form
+    console.log("No recovery parameters found, showing email form");
+    setIsRecoveryFlow(false);
+  }, [location, toast]);
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/password-recovery#type=recovery`,
+      redirectTo: `${window.location.origin}/password-recovery`,
     });
 
     if (error) {

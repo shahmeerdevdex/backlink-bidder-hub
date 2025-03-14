@@ -1,7 +1,9 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
+      console.log("Auth state change:", event);
       handleAuthChange(event, session?.user);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -69,10 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleAuthChange = (event: AuthChangeEvent, user: User | null) => {
     if (event === 'PASSWORD_RECOVERY') {
+      console.log("Password recovery event detected");
       toast({
         title: "Password Recovery",
         description: "You can now reset your password.",
       });
+      // No need to navigate here, that will be handled in the components
     } else if (event === 'SIGNED_IN') {
       if (user && !user.email_confirmed_at) {
         toast({
