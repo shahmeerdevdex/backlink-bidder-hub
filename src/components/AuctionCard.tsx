@@ -1,3 +1,4 @@
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +24,11 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { Auction, Bid } from "@/types";
-import { useUser } from "@clerk/clerk-react";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
 
 interface AuctionCardProps {
   auction: Auction;
@@ -36,7 +37,7 @@ interface AuctionCardProps {
 }
 
 export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProps) {
-  const { isSignedIn, user } = useUser();
+  const { user, isEmailVerified } = useAuth();
   const [bidAmount, setBidAmount] = useState<number | null>(null);
   const [isBidding, setIsBidding] = useState(false);
   const [highestBid, setHighestBid] = useState<number>(auction.current_price);
@@ -56,7 +57,7 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
   }, [auction.ends_at]);
 
   const placeBid = async () => {
-    if (!isSignedIn || !user) {
+    if (!user) {
       toast({
         title: "You must be signed in to place a bid.",
         description: "Please sign in to continue.",
@@ -118,7 +119,7 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
         toast({
           title: `Bid of $${bid.amount} placed successfully!`,
           description: "Your bid has been recorded.",
-          variant: "default", // Changed from 'success' to 'default' to fix TypeScript error
+          variant: "default",
         });
       }
     } catch (error) {

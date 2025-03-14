@@ -10,17 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-interface Auction {
-  id: string;
-  title: string;
-  description: string;
-  starting_price: number;
-  current_price: number;
-  max_spots: number;
-  filled_spots: number;
-  ends_at: string;
-}
+import { Auction, Bid } from '@/types';
 
 export default function Index() {
   const [auctions, setAuctions] = useState<Auction[]>([]);
@@ -64,6 +54,15 @@ export default function Index() {
     };
   }, [sortBy]);
 
+  const handleBidPlaced = (newBid: Bid) => {
+    // Update the auction in the list with the new bid amount
+    setAuctions(auctions.map(auction => 
+      auction.id === newBid.auction_id 
+        ? { ...auction, current_price: newBid.amount } 
+        : auction
+    ));
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -84,13 +83,8 @@ export default function Index() {
         {auctions.map((auction) => (
           <AuctionCard
             key={auction.id}
-            {...auction}
-            startingPrice={auction.starting_price}
-            currentPrice={auction.current_price}
-            maxSpots={auction.max_spots}
-            filledSpots={auction.filled_spots}
-            endsAt={auction.ends_at}
-            onBidClick={() => navigate(`/auctions/${auction.id}`)}
+            auction={auction}
+            onBidPlaced={handleBidPlaced}
           />
         ))}
         {auctions.length === 0 && (
