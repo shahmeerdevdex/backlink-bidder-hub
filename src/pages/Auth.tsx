@@ -17,6 +17,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [showResetForm, setShowResetForm] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -30,6 +31,7 @@ export default function Auth() {
     // Check for password reset token
     if (fullUrl.includes('type=recovery')) {
       setShowResetForm(true);
+      setIsPasswordRecovery(true);
       toast({
         title: "Password Reset",
         description: "Please enter your new password.",
@@ -45,12 +47,13 @@ export default function Auth() {
     }
   }, [toast]);
 
+  // Redirect authenticated users, but not during password recovery
   useEffect(() => {
-    if (user) {
+    if (user && !isPasswordRecovery) {
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
-  }, [user, navigate, location]);
+  }, [user, navigate, location, isPasswordRecovery]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,7 +155,11 @@ export default function Auth() {
         description: "Your password has been successfully updated. You can now sign in.",
       });
       setShowResetForm(false);
+      setIsPasswordRecovery(false);
       setActiveTab('signin');
+      
+      // Sign out after password reset to ensure clean authentication state
+      await supabase.auth.signOut();
     }
     setLoading(false);
   };
