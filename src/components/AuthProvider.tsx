@@ -3,7 +3,6 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -77,7 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Password Recovery",
         description: "You can now reset your password.",
       });
-      // No need to navigate here, that will be handled in the components
+      
+      // Store the recovery state in localStorage to persist through page refreshes
+      localStorage.setItem('passwordRecoveryActive', 'true');
+      
+      // No need to navigate here, that will be handled in the Auth.tsx component
     } else if (event === 'SIGNED_IN') {
       if (user && !user.email_confirmed_at) {
         toast({
@@ -96,6 +99,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Signed Out",
         description: "You have been signed out.",
       });
+      // Clear any recovery state when signing out
+      localStorage.removeItem('passwordRecoveryActive');
     } else if (event === 'USER_UPDATED') {
       toast({
         title: "Profile Updated",

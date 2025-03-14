@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,7 @@ export default function PasswordRecovery() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   const form = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
@@ -46,49 +47,36 @@ export default function PasswordRecovery() {
   useEffect(() => {
     console.log("Checking for recovery token...");
     
-    // First check if we have state passed from Auth.tsx
-    if (location.state?.type === 'recovery' && location.state?.token) {
-      console.log("Recovery token found in location state");
-      setIsRecoveryFlow(true);
-      toast({
-        title: "Password Reset",
-        description: "Please enter your new password.",
-      });
-      return;
-    }
-    
-    // If not in state, check URL parameters directly
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const type = params.get('type');
-    
+    // Look for token and type in all possible places
+    const token = searchParams.get('token') || 
+                  location.state?.token || 
+                  new URLSearchParams(window.location.hash.substring(1)).get('token');
+                  
+    const type = searchParams.get('type') || 
+                location.state?.type || 
+                new URLSearchParams(window.location.hash.substring(1)).get('type');
+
+    // Store recovery state in localStorage to persist through page refreshes
     if (type === 'recovery' && token) {
-      console.log("Recovery token found in URL parameters:", token);
+      console.log("Recovery token found:", token);
+      localStorage.setItem('passwordRecoveryActive', 'true');
       setIsRecoveryFlow(true);
       toast({
         title: "Password Reset",
         description: "Please enter your new password.",
       });
-      return;
+    } else {
+      // Check if we have a stored recovery state
+      const storedRecoveryState = localStorage.getItem('passwordRecoveryActive');
+      if (storedRecoveryState === 'true') {
+        console.log("Recovery flow detected from localStorage");
+        setIsRecoveryFlow(true);
+      } else {
+        console.log("No recovery parameters found, showing email form");
+        setIsRecoveryFlow(false);
+      }
     }
-    
-    // As a fallback, check for hash parameters
-    const hash = window.location.hash.substring(1);
-    const hashParams = new URLSearchParams(hash);
-    if (hashParams.get('type') === 'recovery') {
-      console.log("Recovery flow detected from hash");
-      setIsRecoveryFlow(true);
-      toast({
-        title: "Password Reset",
-        description: "Please enter your new password.",
-      });
-      return;
-    }
-    
-    // If no recovery parameters found, show the request reset email form
-    console.log("No recovery parameters found, showing email form");
-    setIsRecoveryFlow(false);
-  }, [location, toast]);
+  }, [location, toast, searchParams]);
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,6 +124,9 @@ export default function PasswordRecovery() {
         variant: "destructive",
       });
     } else {
+      // Clear the recovery state
+      localStorage.removeItem('passwordRecoveryActive');
+      
       toast({
         title: "Password Updated",
         description: "Your password has been successfully updated. You can now sign in.",

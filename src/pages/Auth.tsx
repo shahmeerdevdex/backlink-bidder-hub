@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,19 +20,19 @@ export default function Auth() {
   const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   
-  // Check URL parameters for email verification
+  // Check URL parameters for email verification and recovery token
   useEffect(() => {
     // Parse the URL to check for recovery token
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const type = params.get('type');
+    const token = searchParams.get('token');
+    const type = searchParams.get('type');
     
     // Check for password reset token
     if (type === 'recovery' && token) {
       console.log("Recovery link detected with token, redirecting to password recovery page");
       // Pass the token and redirect_to params to the password recovery page
-      const redirectTo = params.get('redirect_to') || '';
+      const redirectTo = searchParams.get('redirect_to') || '';
       navigate('/password-recovery', { 
         replace: true,
         state: { token, type, redirect_to: redirectTo }
@@ -47,7 +47,7 @@ export default function Auth() {
         description: "Your email has been verified. You can now sign in.",
       });
     }
-  }, [toast, navigate]);
+  }, [toast, navigate, searchParams]);
 
   // Redirect authenticated users
   useEffect(() => {
