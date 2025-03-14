@@ -7,11 +7,12 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Initialize SMTP client for Gmail
+// Initialize SMTP client for Private Email
 const smtpClient = new SMTPClient({
-  user: 'shahmeerhussainkhadmi@gmail.com',
-  password: 'pssw zbin pbic omuc',
-  host: 'smtp.gmail.com',
+  user: 'sabina@elegantmentions.com',
+  password: 'cjiaXnh5piNh!nj',
+  host: 'mail.privateemail.com',
+  port: 465, // Using SSL port
   ssl: true,
 })
 
