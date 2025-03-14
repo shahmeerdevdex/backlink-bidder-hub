@@ -42,46 +42,52 @@ export default function PasswordRecovery() {
     },
   });
 
-  // Check URL parameters for password reset
+  // Check for recovery token from multiple sources
   useEffect(() => {
     console.log("Checking for recovery token...");
     
-    // First check if we have state passed from Auth.tsx
-    if (location.state?.type === 'recovery' && location.state?.token) {
-      console.log("Recovery token found in location state");
+    // Function to handle recovery detection
+    const handleRecoveryDetected = () => {
+      console.log("Recovery flow detected");
       setIsRecoveryFlow(true);
       toast({
         title: "Password Reset",
         description: "Please enter your new password.",
       });
-      return;
-    }
+    };
     
-    // If not in state, check URL parameters directly
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const type = params.get('type');
+    // 1. First check current URL parameters directly
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get('token');
+    const type = url.searchParams.get('type');
     
     if (type === 'recovery' && token) {
-      console.log("Recovery token found in URL parameters:", token);
-      setIsRecoveryFlow(true);
-      toast({
-        title: "Password Reset",
-        description: "Please enter your new password.",
-      });
+      console.log("Recovery token found in URL parameters");
+      handleRecoveryDetected();
       return;
     }
     
-    // As a fallback, check for hash parameters
+    // 2. Check if we have state passed from Auth.tsx or AuthProvider
+    if (location.state?.type === 'recovery' && location.state?.token) {
+      console.log("Recovery token found in location state");
+      handleRecoveryDetected();
+      return;
+    }
+    
+    // 3. Check for hash parameters (Supabase sometimes uses hash)
     const hash = window.location.hash.substring(1);
     const hashParams = new URLSearchParams(hash);
     if (hashParams.get('type') === 'recovery') {
       console.log("Recovery flow detected from hash");
-      setIsRecoveryFlow(true);
-      toast({
-        title: "Password Reset",
-        description: "Please enter your new password.",
-      });
+      handleRecoveryDetected();
+      return;
+    }
+    
+    // 4. Check if we're in the auth flow with a recovery action
+    const accessToken = url.searchParams.get('access_token');
+    if (accessToken) {
+      console.log("Access token found, checking if it's a recovery flow");
+      handleRecoveryDetected();
       return;
     }
     

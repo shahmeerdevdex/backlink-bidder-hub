@@ -21,18 +21,18 @@ export default function Auth() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Check URL parameters for email verification
+  // Check URL parameters for email verification or password recovery
   useEffect(() => {
     // Parse the URL to check for recovery token
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const type = params.get('type');
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get('token');
+    const type = url.searchParams.get('type');
     
     // Check for password reset token
     if (type === 'recovery' && token) {
       console.log("Recovery link detected with token, redirecting to password recovery page");
       // Pass the token and redirect_to params to the password recovery page
-      const redirectTo = params.get('redirect_to') || '';
+      const redirectTo = url.searchParams.get('redirect_to') || '';
       navigate('/password-recovery', { 
         replace: true,
         state: { token, type, redirect_to: redirectTo }
@@ -46,6 +46,20 @@ export default function Auth() {
         title: "Email Verified",
         description: "Your email has been verified. You can now sign in.",
       });
+    }
+
+    // Also check for hash-based parameters (some Supabase redirects use hash)
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+      const hashParams = new URLSearchParams(hash);
+      if (hashParams.get('type') === 'recovery') {
+        console.log("Recovery link detected in hash, redirecting to password recovery page");
+        navigate('/password-recovery', { 
+          replace: true,
+          state: { type: 'recovery' }
+        });
+        return;
+      }
     }
   }, [toast, navigate]);
 

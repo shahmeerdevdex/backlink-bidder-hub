@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const refreshSession = async () => {
     const { data, error } = await supabase.auth.refreshSession();
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
       console.log("Auth state change:", event);
-      handleAuthChange(event, session?.user);
+      handleAuthChange(event, session);
       setUser(session?.user ?? null);
       if (session?.user) {
         setIsEmailVerified(!!session.user.email_confirmed_at);
@@ -68,27 +69,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
-  const handleAuthChange = (event: AuthChangeEvent, user: User | null) => {
+  const handleAuthChange = (event: AuthChangeEvent, session: Session | null) => {
     if (event === 'PASSWORD_RECOVERY') {
       console.log("Password recovery event detected");
+      // Explicitly navigate to password-recovery page with recovery token information
+      const url = new URL(window.location.href);
+      const token = url.searchParams.get('token');
+      const type = url.searchParams.get('type');
+      const redirectTo = url.searchParams.get('redirect_to');
+      
+      // Wait a brief moment to ensure navigation happens after other auth processing
+      setTimeout(() => {
+        navigate('/password-recovery', { 
+          replace: true,
+          state: { token, type, redirect_to: redirectTo }
+        });
+      }, 100);
+      
       toast({
         title: "Password Recovery",
         description: "You can now reset your password.",
       });
-      // No need to navigate here, that will be handled in the components
     } else if (event === 'SIGNED_IN') {
-      if (user && !user.email_confirmed_at) {
+      if (session?.user && !session.user.email_confirmed_at) {
         toast({
           title: "Email Not Verified",
           description: "Please check your email to verify your account.",
           variant: "destructive",
         });
-      } else if (user) {
+      } else if (session?.user) {
         toast({
           title: "Welcome Back",
-          description: `Signed in as ${user.email}`,
+          description: `Signed in as ${session.user.email}`,
         });
       }
     } else if (event === 'SIGNED_OUT') {
