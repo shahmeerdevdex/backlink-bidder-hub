@@ -16,27 +16,21 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
-  const [showResetForm, setShowResetForm] = useState(false);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Check URL parameters for password reset or email verification
+  // Check URL parameters for email verification
   useEffect(() => {
     // Get the full URL including hash
     const fullUrl = window.location.href;
     
     // Check for password reset token
     if (fullUrl.includes('type=recovery')) {
-      console.log("Recovery link detected, showing password reset form");
-      setShowResetForm(true);
-      setIsPasswordRecovery(true);
-      toast({
-        title: "Password Reset",
-        description: "Please enter your new password.",
-      });
+      console.log("Recovery link detected, redirecting to password recovery page");
+      navigate('/password-recovery', { replace: true });
+      return;
     }
     
     // Check for email verification success
@@ -46,15 +40,15 @@ export default function Auth() {
         description: "Your email has been verified. You can now sign in.",
       });
     }
-  }, [toast]);
+  }, [toast, navigate]);
 
-  // Redirect authenticated users, but not during password recovery
+  // Redirect authenticated users
   useEffect(() => {
-    if (user && !isPasswordRecovery) {
+    if (user) {
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
-  }, [user, navigate, location, isPasswordRecovery]);
+  }, [user, navigate, location]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,68 +97,6 @@ export default function Auth() {
     setLoading(false);
   };
 
-  const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth#type=recovery`,
-    });
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Recovery Email Sent",
-        description: "Check your email for the password reset link.",
-      });
-      setShowResetForm(false);
-    }
-    setLoading(false);
-  };
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password || password.length < 6) {
-      toast({
-        title: "Invalid Password",
-        description: "Password must be at least 6 characters long.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    
-    const { error } = await supabase.auth.updateUser({
-      password,
-    });
-
-    if (error) {
-      toast({
-        title: "Error updating password",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Password Updated",
-        description: "Your password has been successfully updated. You can now sign in.",
-      });
-      setShowResetForm(false);
-      setIsPasswordRecovery(false);
-      setActiveTab('signin');
-      
-      // Sign out after password reset to ensure clean authentication state
-      await supabase.auth.signOut();
-    }
-    setLoading(false);
-  };
-
   const handleGithubLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
@@ -181,81 +113,6 @@ export default function Auth() {
       });
     }
   };
-
-  const renderPasswordResetForm = () => {
-    // Check if this is a password recovery with token (user clicked link from email)
-    if (isPasswordRecovery || window.location.href.includes('type=recovery')) {
-      return (
-        <div className="space-y-4">
-          <div className="text-center mb-4">
-            <h2 className="text-xl font-semibold">Reset Your Password</h2>
-            <p className="text-sm text-muted-foreground">Enter your new password below</p>
-          </div>
-          <form onSubmit={handleUpdatePassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                placeholder="Enter your new password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Updating...' : 'Update Password'}
-            </Button>
-          </form>
-        </div>
-      );
-    } else {
-      // This is for the initial password reset request form
-      return (
-        <div className="space-y-4">
-          <div className="text-center mb-4">
-            <h2 className="text-xl font-semibold">Reset Your Password</h2>
-            <p className="text-sm text-muted-foreground">Enter your email to receive a password reset link</p>
-          </div>
-          <form onSubmit={handlePasswordReset} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="reset-email">Email</Label>
-              <Input
-                id="reset-email"
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Sending...' : 'Send Reset Link'}
-            </Button>
-            <div className="text-center">
-              <Button variant="link" onClick={() => setShowResetForm(false)}>
-                Back to Sign In
-              </Button>
-            </div>
-          </form>
-        </div>
-      );
-    }
-  };
-
-  // Check if we need to show the password reset form
-  if (showResetForm || window.location.href.includes('type=recovery')) {
-    return (
-      <div className="container max-w-md mx-auto px-4 py-16">
-        <Card>
-          <CardContent className="pt-6">
-            {renderPasswordResetForm()}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="container max-w-md mx-auto px-4 py-16">
@@ -302,7 +159,7 @@ export default function Auth() {
                   <Button 
                     variant="link" 
                     type="button" 
-                    onClick={() => setShowResetForm(true)}
+                    onClick={() => navigate('/password-recovery')}
                     className="text-sm text-muted-foreground"
                   >
                     Forgot your password?

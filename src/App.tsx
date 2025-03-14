@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { NavBar } from "@/components/NavBar";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import PasswordRecovery from "./pages/PasswordRecovery";
 import AuctionDetail from "./pages/AuctionDetail";
 import AuctionManagement from "./pages/AuctionManagement";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -30,6 +31,7 @@ const App = () => (
           <NavBar />
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/password-recovery" element={<PasswordRecovery />} />
             <Route path="/" element={<Index />} />
             <Route 
               path="/dashboard" 
