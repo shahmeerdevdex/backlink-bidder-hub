@@ -22,20 +22,22 @@ export default function Auth() {
   const { toast } = useToast();
   const { user } = useAuth();
   
+  // Check URL parameters for password reset or email verification
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
+    // Get the full URL including hash
+    const fullUrl = window.location.href;
+    
+    // Check for password reset token
+    if (fullUrl.includes('type=recovery')) {
       setShowResetForm(true);
-      const token = new URLSearchParams(hash.substring(1)).get('access_token');
-      if (token) {
-        toast({
-          title: "Password Reset",
-          description: "Please enter your new password.",
-        });
-      }
+      toast({
+        title: "Password Reset",
+        description: "Please enter your new password.",
+      });
     }
     
-    if (hash && hash.includes('type=signup')) {
+    // Check for email verification success
+    if (fullUrl.includes('type=signup')) {
       toast({
         title: "Email Verified",
         description: "Your email has been verified. You can now sign in.",
@@ -173,7 +175,8 @@ export default function Auth() {
   };
 
   const renderPasswordResetForm = () => {
-    if (window.location.hash.includes('type=recovery')) {
+    // Check if this is a password recovery with token (user clicked link from email)
+    if (window.location.href.includes('type=recovery')) {
       return (
         <div className="space-y-4">
           <div className="text-center mb-4">
@@ -190,20 +193,17 @@ export default function Auth() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Updating...' : 'Update Password'}
             </Button>
-            <div className="text-center">
-              <Button variant="link" onClick={() => setShowResetForm(false)}>
-                Back to Sign In
-              </Button>
-            </div>
           </form>
         </div>
       );
     } else {
+      // This is for the initial password reset request form
       return (
         <div className="space-y-4">
           <div className="text-center mb-4">
@@ -236,7 +236,8 @@ export default function Auth() {
     }
   };
 
-  if (showResetForm || window.location.hash.includes('type=recovery')) {
+  // Check if we need to show the password reset form
+  if (showResetForm || window.location.href.includes('type=recovery')) {
     return (
       <div className="container max-w-md mx-auto px-4 py-16">
         <Card>
