@@ -77,19 +77,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "You can now reset your password.",
       });
       
-      // Store the recovery token from URL in localStorage
+      // Extract token from all possible places in the URL
       const url = new URL(window.location.href);
       const token = url.searchParams.get('token') || 
-                    new URLSearchParams(window.location.hash.substring(1)).get('token');
+                    new URLSearchParams(window.location.hash.substring(1)).get('token') ||
+                    url.hash.match(/token=([^&]*)/)?.[1];
+      
+      console.log("Found recovery token:", token ? "yes" : "no");
       
       if (token) {
         localStorage.setItem('passwordRecoveryToken', token);
+        console.log("Stored recovery token in localStorage");
       }
       
       // Always set the recovery state to true when this event is triggered
       localStorage.setItem('passwordRecoveryActive', 'true');
+      console.log("Set passwordRecoveryActive to true in localStorage");
       
-      // No need to navigate here, that will be handled in the Auth.tsx component
+      // Force navigate to the password recovery page
+      if (window.location.pathname !== '/password-recovery') {
+        console.log("Redirecting to password recovery page");
+        window.location.href = '/password-recovery';
+      }
     } else if (event === 'SIGNED_IN') {
       if (user && !user.email_confirmed_at) {
         toast({

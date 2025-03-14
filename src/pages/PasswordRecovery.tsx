@@ -34,6 +34,7 @@ export default function PasswordRecovery() {
   const location = useLocation();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const [tokenChecked, setTokenChecked] = useState(false);
 
   const form = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
@@ -45,7 +46,18 @@ export default function PasswordRecovery() {
 
   // Check URL parameters for password reset
   useEffect(() => {
+    if (tokenChecked) return; // Only run once
+    
     console.log("Checking for recovery token...");
+    
+    // Check if we're in the passwordRecoveryActive state first
+    const storedActive = localStorage.getItem('passwordRecoveryActive');
+    if (storedActive === 'true') {
+      console.log("Found passwordRecoveryActive=true in localStorage");
+      setIsRecoveryFlow(true);
+      setTokenChecked(true);
+      return;
+    }
     
     // Look for token and type in all possible places
     const queryToken = searchParams.get('token');
@@ -56,18 +68,20 @@ export default function PasswordRecovery() {
     const hashType = new URLSearchParams(window.location.hash.substring(1)).get('type');
     const storedToken = localStorage.getItem('passwordRecoveryToken');
     
+    // Log what we found
+    console.log("Query token:", queryToken ? "found" : "not found");
+    console.log("Location token:", locationToken ? "found" : "not found");
+    console.log("Hash token:", hashToken ? "found" : "not found");
+    console.log("Stored token:", storedToken ? "found" : "not found");
+    
     // Use the first token we find
     const token = queryToken || locationToken || hashToken || storedToken;
     const type = queryType || locationType || hashType;
 
     // Store new token if found
     if (token) {
+      console.log("Found token, storing in localStorage");
       localStorage.setItem('passwordRecoveryToken', token);
-    }
-
-    // Store recovery state in localStorage to persist through page refreshes
-    if ((type === 'recovery' && token) || location.pathname === '/password-recovery' && localStorage.getItem('passwordRecoveryActive') === 'true') {
-      console.log("Recovery flow detected", token ? "from token" : "from localStorage");
       localStorage.setItem('passwordRecoveryActive', 'true');
       setIsRecoveryFlow(true);
       
@@ -76,17 +90,12 @@ export default function PasswordRecovery() {
         description: "Please enter your new password.",
       });
     } else {
-      // If no recovery state was found in the URL or localStorage
-      const storedRecoveryState = localStorage.getItem('passwordRecoveryActive');
-      if (storedRecoveryState === 'true') {
-        console.log("Recovery flow detected from localStorage");
-        setIsRecoveryFlow(true);
-      } else {
-        console.log("No recovery parameters found, showing email form");
-        setIsRecoveryFlow(false);
-      }
+      console.log("No recovery parameters found, showing email form");
+      setIsRecoveryFlow(false);
     }
-  }, [location, toast, searchParams]);
+    
+    setTokenChecked(true);
+  }, [location, toast, searchParams, tokenChecked]);
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
