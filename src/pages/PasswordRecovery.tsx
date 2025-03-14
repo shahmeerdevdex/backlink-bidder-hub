@@ -7,15 +7,40 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Eye, EyeOff } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+// Define form schema with Zod
+const passwordSchema = z.object({
+  password: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
+  confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 export default function PasswordRecovery() {
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRecoveryFlow, setIsRecoveryFlow] = useState(false);
   const [email, setEmail] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+
+  const form = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: {
+      password: '',
+      confirmPassword: '',
+    },
+  });
 
   // Check URL parameters for password reset
   useEffect(() => {
@@ -59,12 +84,11 @@ export default function PasswordRecovery() {
     setLoading(false);
   };
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password || password.length < 6) {
+  const onSubmit = async (data: PasswordFormValues) => {
+    if (data.password !== data.confirmPassword) {
       toast({
-        title: "Invalid Password",
-        description: "Password must be at least 6 characters long.",
+        title: "Passwords Don't Match",
+        description: "Please make sure your passwords match.",
         variant: "destructive",
       });
       return;
@@ -73,7 +97,7 @@ export default function PasswordRecovery() {
     setLoading(true);
     
     const { error } = await supabase.auth.updateUser({
-      password,
+      password: data.password,
     });
 
     if (error) {
@@ -130,7 +154,7 @@ export default function PasswordRecovery() {
     );
   };
 
-  // Render the new password form
+  // Render the new password form with two password fields
   const renderNewPasswordForm = () => {
     return (
       <div className="space-y-4">
@@ -138,23 +162,71 @@ export default function PasswordRecovery() {
           <h2 className="text-xl font-semibold">Reset Your Password</h2>
           <p className="text-sm text-muted-foreground">Enter your new password below</p>
         </div>
-        <form onSubmit={handleUpdatePassword} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New Password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              placeholder="Enter your new password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>New Password</FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <Input
+                        placeholder="Enter your new password"
+                        type={showPassword ? "text" : "password"}
+                        {...field}
+                      />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Updating...' : 'Update Password'}
-          </Button>
-        </form>
+            
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm Password</FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <Input
+                        placeholder="Confirm your new password"
+                        type={showConfirmPassword ? "text" : "password"}
+                        {...field}
+                      />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Updating...' : 'Update Password'}
+            </Button>
+          </form>
+        </Form>
       </div>
     );
   };
@@ -166,7 +238,7 @@ export default function PasswordRecovery() {
           <CardTitle>Password Recovery</CardTitle>
           <CardDescription>
             {isRecoveryFlow 
-              ? "Enter your new password" 
+              ? "Create a new password" 
               : "Request a password reset link"}
           </CardDescription>
         </CardHeader>
