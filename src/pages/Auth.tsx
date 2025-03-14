@@ -33,6 +33,12 @@ export default function Auth() {
       console.log("Recovery link detected with token, redirecting to password recovery page");
       // Pass the token and redirect_to params to the password recovery page
       const redirectTo = searchParams.get('redirect_to') || '';
+      
+      // Store the token in localStorage before redirecting
+      localStorage.setItem('passwordRecoveryToken', token);
+      localStorage.setItem('passwordRecoveryActive', 'true');
+      
+      // Navigate to password recovery page
       navigate('/password-recovery', { 
         replace: true,
         state: { token, type, redirect_to: redirectTo }

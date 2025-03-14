@@ -77,7 +77,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "You can now reset your password.",
       });
       
-      // Store the recovery state in localStorage to persist through page refreshes
+      // Store the recovery token from URL in localStorage
+      const url = new URL(window.location.href);
+      const token = url.searchParams.get('token') || 
+                    new URLSearchParams(window.location.hash.substring(1)).get('token');
+      
+      if (token) {
+        localStorage.setItem('passwordRecoveryToken', token);
+      }
+      
+      // Always set the recovery state to true when this event is triggered
       localStorage.setItem('passwordRecoveryActive', 'true');
       
       // No need to navigate here, that will be handled in the Auth.tsx component
@@ -101,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       // Clear any recovery state when signing out
       localStorage.removeItem('passwordRecoveryActive');
+      localStorage.removeItem('passwordRecoveryToken');
     } else if (event === 'USER_UPDATED') {
       toast({
         title: "Profile Updated",

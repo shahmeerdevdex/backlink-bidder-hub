@@ -48,25 +48,35 @@ export default function PasswordRecovery() {
     console.log("Checking for recovery token...");
     
     // Look for token and type in all possible places
-    const token = searchParams.get('token') || 
-                  location.state?.token || 
-                  new URLSearchParams(window.location.hash.substring(1)).get('token');
-                  
-    const type = searchParams.get('type') || 
-                location.state?.type || 
-                new URLSearchParams(window.location.hash.substring(1)).get('type');
+    const queryToken = searchParams.get('token');
+    const queryType = searchParams.get('type');
+    const locationToken = location.state?.token;
+    const locationType = location.state?.type;
+    const hashToken = new URLSearchParams(window.location.hash.substring(1)).get('token');
+    const hashType = new URLSearchParams(window.location.hash.substring(1)).get('type');
+    const storedToken = localStorage.getItem('passwordRecoveryToken');
+    
+    // Use the first token we find
+    const token = queryToken || locationToken || hashToken || storedToken;
+    const type = queryType || locationType || hashType;
+
+    // Store new token if found
+    if (token) {
+      localStorage.setItem('passwordRecoveryToken', token);
+    }
 
     // Store recovery state in localStorage to persist through page refreshes
-    if (type === 'recovery' && token) {
-      console.log("Recovery token found:", token);
+    if ((type === 'recovery' && token) || location.pathname === '/password-recovery' && localStorage.getItem('passwordRecoveryActive') === 'true') {
+      console.log("Recovery flow detected", token ? "from token" : "from localStorage");
       localStorage.setItem('passwordRecoveryActive', 'true');
       setIsRecoveryFlow(true);
+      
       toast({
         title: "Password Reset",
         description: "Please enter your new password.",
       });
     } else {
-      // Check if we have a stored recovery state
+      // If no recovery state was found in the URL or localStorage
       const storedRecoveryState = localStorage.getItem('passwordRecoveryActive');
       if (storedRecoveryState === 'true') {
         console.log("Recovery flow detected from localStorage");
@@ -126,6 +136,7 @@ export default function PasswordRecovery() {
     } else {
       // Clear the recovery state
       localStorage.removeItem('passwordRecoveryActive');
+      localStorage.removeItem('passwordRecoveryToken');
       
       toast({
         title: "Password Updated",
