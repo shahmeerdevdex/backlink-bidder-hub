@@ -30,6 +30,7 @@ export default function Auth() {
     
     // Check for password reset token
     if (fullUrl.includes('type=recovery')) {
+      console.log("Recovery link detected, showing password reset form");
       setShowResetForm(true);
       setIsPasswordRecovery(true);
       toast({
@@ -183,7 +184,7 @@ export default function Auth() {
 
   const renderPasswordResetForm = () => {
     // Check if this is a password recovery with token (user clicked link from email)
-    if (window.location.href.includes('type=recovery')) {
+    if (isPasswordRecovery || window.location.href.includes('type=recovery')) {
       return (
         <div className="space-y-4">
           <div className="text-center mb-4">
