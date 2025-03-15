@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +27,7 @@ export default function PasswordRecovery() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const [tokenChecked, setTokenChecked] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const form = useForm<PasswordFormValues>({
@@ -37,21 +36,6 @@ export default function PasswordRecovery() {
       confirmPassword: '',
     },
   });
-
-  useEffect(() => {
-    const storedActive = localStorage.getItem('passwordRecoveryActive');
-    const queryToken = searchParams.get('token');
-    const queryType = searchParams.get('type');
-    
-    if (user && (storedActive === 'true' || (queryToken && queryType === 'recovery'))) {
-      console.log("User is signed in but needs password recovery. Signing out first...");
-      const performSignOut = async () => {
-        await signOut();
-        setTokenChecked(false);
-      };
-      performSignOut();
-    }
-  }, [user, searchParams, signOut]);
 
   useEffect(() => {
     if (tokenChecked) return;
