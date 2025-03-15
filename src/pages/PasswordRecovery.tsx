@@ -29,6 +29,7 @@ export default function PasswordRecovery() {
   const [searchParams] = useSearchParams();
   const [tokenChecked, setTokenChecked] = useState(false);
   const { user, signOut } = useAuth();
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const form = useForm<PasswordFormValues>({
     defaultValues: {
@@ -85,12 +86,46 @@ export default function PasswordRecovery() {
       console.log("Found token, storing in localStorage");
       localStorage.setItem('passwordRecoveryToken', token);
       localStorage.setItem('passwordRecoveryActive', 'true');
+      setAccessToken(token);
       setIsRecoveryFlow(true);
       
-      toast({
-        title: "Password Reset",
-        description: "Please enter your new password.",
-      });
+      // Verify the token immediately to create a session
+      const verifyToken = async () => {
+        try {
+          console.log("Verifying recovery token:", token);
+          // Use setSession to set the recovery token
+          const { error } = await supabase.auth.setSession({
+            access_token: token,
+            refresh_token: '',
+          });
+          
+          if (error) {
+            console.error("Error verifying token:", error);
+            toast({
+              title: "Invalid or Expired Link",
+              description: "The password reset link is invalid or has expired. Please request a new one.",
+              variant: "destructive",
+            });
+            setIsRecoveryFlow(false);
+          } else {
+            console.log("Token verified successfully");
+            toast({
+              title: "Password Reset",
+              description: "Please enter your new password.",
+            });
+          }
+        } catch (error) {
+          console.error("Exception verifying token:", error);
+          toast({
+            title: "Error",
+            description: "An unexpected error occurred. Please try again.",
+            variant: "destructive",
+          });
+          setIsRecoveryFlow(false);
+        }
+      };
+      
+      verifyToken();
     } else {
       console.log("No recovery parameters found, showing email form");
       setIsRecoveryFlow(false);
@@ -163,29 +198,45 @@ export default function PasswordRecovery() {
 
     setLoading(true);
     
-    const { error } = await supabase.auth.updateUser({
-      password: data.password,
-    });
+    try {
+      console.log("Updating password...");
+      
+      // Use the update user API 
+      const { error } = await supabase.auth.updateUser({
+        password: data.password,
+      });
 
-    if (error) {
+      if (error) {
+        console.error("Error updating password:", error);
+        toast({
+          title: "Error updating password",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log("Password updated successfully");
+        localStorage.removeItem('passwordRecoveryActive');
+        localStorage.removeItem('passwordRecoveryToken');
+        
+        toast({
+          title: "Password Updated",
+          description: "Your password has been successfully updated. You can now sign in.",
+        });
+        
+        // Sign out to ensure clean state
+        await supabase.auth.signOut();
+        
+        navigate('/auth', { replace: true });
+      }
+    } catch (error) {
+      console.error("Exception updating password:", error);
       toast({
-        title: "Error updating password",
-        description: error.message,
+        title: "Error",
+        description: "An unexpected error occurred while updating your password. Please try again.",
         variant: "destructive",
       });
-    } else {
-      localStorage.removeItem('passwordRecoveryActive');
-      localStorage.removeItem('passwordRecoveryToken');
-      
-      toast({
-        title: "Password Updated",
-        description: "Your password has been successfully updated. You can now sign in.",
-      });
-      
-      await supabase.auth.signOut();
-      
-      navigate('/auth', { replace: true });
     }
+    
     setLoading(false);
   };
 
