@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { SMTPClient } from 'npm:emailjs@4.0.3'
 
@@ -21,6 +20,32 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Email signature
+const emailSignature = `
+<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+  <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; color: #333;">
+    <tr>
+      <td valign="top" style="padding-right: 15px;">
+        <img src="https://eleganmentions.com/public/lovable-uploads/b7704d15-73fd-490e-891c-0f6d44db75a7.png" alt="Sabina" width="80" style="border-radius: 5px;">
+      </td>
+      <td valign="top">
+        <p style="margin: 0; font-weight: bold; font-size: 16px;">Sabina</p>
+        <p style="margin: 3px 0; font-size: 14px;">Elegant Mentions</p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="mailto:sabina@elegantmentions.com" style="color: #2754C5; text-decoration: none;">sabina@elegantmentions.com</a>
+        </p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="tel:+13474977079" style="color: #2754C5; text-decoration: none;">+1 347 497 7079</a>
+        </p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="https://elegantmentions.com" style="color: #2754C5; text-decoration: none;">elegantmentions.com</a>
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
+`;
 
 Deno.serve(async (req) => {
   console.log('⚡ [INVOKED] bid-notification-email function started')
@@ -235,7 +260,7 @@ Deno.serve(async (req) => {
       
       try {
         const emailResult = await smtpClient.sendAsync({
-          from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+          from: 'Auction System <sabina@elegantmentions.com>',
           to: outbidUserEmail,
           subject: `You've been outbid on auction: ${auction.title}`,
           text: `You've been outbid on the auction: ${auction.title}.
@@ -271,6 +296,7 @@ Deno.serve(async (req) => {
                   <li>Your highest bid: $${userHighestBid?.amount || 0}</li>
                 </ul>
                 <p>Thank you for participating!</p>
+                ${emailSignature}
               `,
               alternative: true
             }
@@ -333,7 +359,7 @@ Deno.serve(async (req) => {
         console.log(`Sending email to: ${profile.email} about new auction`)
         
         const emailPromise = smtpClient.sendAsync({
-          from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+          from: 'Auction System <sabina@elegantmentions.com>',
           to: profile.email,
           subject: `New Auction Created: ${auction.title}`,
           text: `A new auction has been created: ${auction.title}. 
@@ -356,6 +382,7 @@ Deno.serve(async (req) => {
                 </ul>
                 <p>Don't miss your chance to bid on this exciting auction!</p>
                 <p>Thank you for using our auction system!</p>
+                ${emailSignature}
               `,
               alternative: true
             }
@@ -397,7 +424,7 @@ Deno.serve(async (req) => {
       // Send special email to the auction creator
       try {
         const creatorEmailResult = await smtpClient.sendAsync({
-          from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+          from: 'Auction System <sabina@elegantmentions.com>',
           to: bidderEmail,
           subject: `Your auction "${auction.title}" has been created`,
           text: `Your auction "${auction.title}" has been successfully created.
@@ -419,6 +446,7 @@ Deno.serve(async (req) => {
                 </ul>
                 <p>You will receive notifications when users place bids on your auction.</p>
                 <p>Thank you for using our auction system!</p>
+                ${emailSignature}
               `,
               alternative: true
             }
@@ -500,7 +528,7 @@ Deno.serve(async (req) => {
 
       // Prepare email content
       const emailPromise = smtpClient.sendAsync({
-        from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+        from: 'Auction System <sabina@elegantmentions.com>',
         to: userEmail,
         subject: `New bid placed on auction: ${auction.title}`,
         text: `A new bid has been placed on the auction: ${auction.title}.
@@ -523,6 +551,7 @@ Deno.serve(async (req) => {
               </ul>
               <p>Your position may have changed. Please log in to check your status.</p>
               <p>Thank you for participating!</p>
+              ${emailSignature}
             `,
             alternative: true
           }

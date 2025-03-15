@@ -37,6 +37,29 @@ enable_confirmations = false
 template_create_user = """<h2>Welcome to Our Application</h2>
 <p>Thank you for signing up. Please confirm your email by clicking the link below:</p>
 <p><a href="{{ .ConfirmationURL }}">Confirm Email</a></p>
+
+<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+  <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; color: #333;">
+    <tr>
+      <td valign="top" style="padding-right: 15px;">
+        <img src="https://eleganmentions.com/public/lovable-uploads/b7704d15-73fd-490e-891c-0f6d44db75a7.png" alt="Sabina" width="80" style="border-radius: 5px;">
+      </td>
+      <td valign="top">
+        <p style="margin: 0; font-weight: bold; font-size: 16px;">Sabina</p>
+        <p style="margin: 3px 0; font-size: 14px;">Elegant Mentions</p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="mailto:sabina@elegantmentions.com" style="color: #2754C5; text-decoration: none;">sabina@elegantmentions.com</a>
+        </p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="tel:+13474977079" style="color: #2754C5; text-decoration: none;">+1 347 497 7079</a>
+        </p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="https://elegantmentions.com" style="color: #2754C5; text-decoration: none;">elegantmentions.com</a>
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
 """
 
 template_action_link = """<h2>Password Reset Request</h2>
@@ -46,6 +69,29 @@ template_action_link = """<h2>Password Reset Request</h2>
 <p>If you did not request a password reset, you can safely ignore this email and your password will remain unchanged.</p>
 <p>This link will expire in 24 hours.</p>
 <p>Thank you,<br>The Support Team</p>
+
+<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+  <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; color: #333;">
+    <tr>
+      <td valign="top" style="padding-right: 15px;">
+        <img src="https://eleganmentions.com/public/lovable-uploads/b7704d15-73fd-490e-891c-0f6d44db75a7.png" alt="Sabina" width="80" style="border-radius: 5px;">
+      </td>
+      <td valign="top">
+        <p style="margin: 0; font-weight: bold; font-size: 16px;">Sabina</p>
+        <p style="margin: 3px 0; font-size: 14px;">Elegant Mentions</p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="mailto:sabina@elegantmentions.com" style="color: #2754C5; text-decoration: none;">sabina@elegantmentions.com</a>
+        </p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="tel:+13474977079" style="color: #2754C5; text-decoration: none;">+1 347 497 7079</a>
+        </p>
+        <p style="margin: 3px 0; font-size: 14px;">
+          <a href="https://elegantmentions.com" style="color: #2754C5; text-decoration: none;">elegantmentions.com</a>
+        </p>
+      </td>
+    </tr>
+  </table>
+</div>
 """
 
 [analytics]
