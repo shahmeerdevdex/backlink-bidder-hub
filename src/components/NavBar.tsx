@@ -9,7 +9,7 @@ import {
   NavigationMenuList,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
-import { LogOut, Home, ShoppingBag, User, Users } from 'lucide-react';
+import { LogOut, Home, ShoppingBag, User, Users, Award } from 'lucide-react';
 import { Notifications } from '@/components/Notifications';
 
 export function NavBar() {
@@ -25,55 +25,65 @@ export function NavBar() {
     <div className="border-b">
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
-          <NavigationMenu>
-            <NavigationMenuList>
-              <NavigationMenuItem>
-                <NavigationMenuLink
-                  className={navigationMenuTriggerStyle()}
-                  onClick={() => navigate('/')}
-                >
-                  <Home className="w-4 h-4 mr-2" />
-                  Home
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-              
-              {user && (
-                <>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink
-                      className={navigationMenuTriggerStyle()}
-                      onClick={() => navigate('/dashboard')}
-                    >
-                      <User className="w-4 h-4 mr-2" />
-                      Dashboard
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                  
-                  <NavigationMenuItem>
-                    <NavigationMenuLink
-                      className={navigationMenuTriggerStyle()}
-                      onClick={() => navigate('/my-auctions')}
-                    >
-                      <ShoppingBag className="w-4 h-4 mr-2" />
-                      My Auctions
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-
-                  {isAdmin && (
+          <div className="flex items-center">
+            <div 
+              className="flex items-center mr-4 cursor-pointer" 
+              onClick={() => navigate('/')}
+            >
+              <Award className="w-6 h-6 text-primary mr-2" />
+              <span className="font-bold text-xl">BidderHub</span>
+            </div>
+            
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuLink
+                    className={navigationMenuTriggerStyle()}
+                    onClick={() => navigate('/')}
+                  >
+                    <Home className="w-4 h-4 mr-2" />
+                    Home
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                
+                {user && (
+                  <>
                     <NavigationMenuItem>
                       <NavigationMenuLink
                         className={navigationMenuTriggerStyle()}
-                        onClick={() => navigate('/admin')}
+                        onClick={() => navigate('/dashboard')}
                       >
-                        <Users className="w-4 h-4 mr-2" />
-                        Admin
+                        <User className="w-4 h-4 mr-2" />
+                        Dashboard
                       </NavigationMenuLink>
                     </NavigationMenuItem>
-                  )}
-                </>
-              )}
-            </NavigationMenuList>
-          </NavigationMenu>
+                    
+                    <NavigationMenuItem>
+                      <NavigationMenuLink
+                        className={navigationMenuTriggerStyle()}
+                        onClick={() => navigate('/my-auctions')}
+                      >
+                        <ShoppingBag className="w-4 h-4 mr-2" />
+                        My Auctions
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
+
+                    {isAdmin && (
+                      <NavigationMenuItem>
+                        <NavigationMenuLink
+                          className={navigationMenuTriggerStyle()}
+                          onClick={() => navigate('/admin')}
+                        >
+                          <Users className="w-4 h-4 mr-2" />
+                          Admin
+                        </NavigationMenuLink>
+                      </NavigationMenuItem>
+                    )}
+                  </>
+                )}
+              </NavigationMenuList>
+            </NavigationMenu>
+          </div>
 
           <div className="flex items-center gap-4">
             {user && <Notifications />}
