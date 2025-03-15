@@ -31,7 +31,7 @@ const emailSignature = `
         <img src="https://eleganmentions.com/public/lovable-uploads/b7704d15-73fd-490e-891c-0f6d44db75a7.png" alt="Sabina" width="80" style="border-radius: 5px;">
       </td>
       <td valign="top">
-        <p style="margin: 0; font-weight: bold; font-size: 16px;">Sabina</p>
+        <p style="margin: 0; font-weight: bold; font-size: 16px;">EM Auctions Team</p>
         <p style="margin: 3px 0; font-size: 14px;">Elegant Mentions</p>
         <p style="margin: 3px 0; font-size: 14px;">
           <a href="mailto:sabina@elegantmentions.com" style="color: #2754C5; text-decoration: none;">sabina@elegantmentions.com</a>
