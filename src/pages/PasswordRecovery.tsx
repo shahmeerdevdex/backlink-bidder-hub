@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +13,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/components/AuthProvider';
 
-// Define form schema with Zod
 const passwordSchema = z.object({
   password: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
   confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
@@ -46,9 +44,7 @@ export default function PasswordRecovery() {
     },
   });
 
-  // Sign out the user if they're trying to access the password recovery page while signed in
   useEffect(() => {
-    // Only sign out if we're actually in recovery mode
     const storedActive = localStorage.getItem('passwordRecoveryActive');
     const queryToken = searchParams.get('token');
     const queryType = searchParams.get('type');
@@ -57,20 +53,17 @@ export default function PasswordRecovery() {
       console.log("User is signed in but needs password recovery. Signing out first...");
       const performSignOut = async () => {
         await signOut();
-        // After sign out, we need to refresh the token check
         setTokenChecked(false);
       };
       performSignOut();
     }
   }, [user, searchParams, signOut]);
 
-  // Check URL parameters for password reset
   useEffect(() => {
-    if (tokenChecked) return; // Only run once
+    if (tokenChecked) return;
     
     console.log("Checking for recovery token...");
     
-    // Check if we're in the passwordRecoveryActive state first
     const storedActive = localStorage.getItem('passwordRecoveryActive');
     if (storedActive === 'true') {
       console.log("Found passwordRecoveryActive=true in localStorage");
@@ -79,7 +72,6 @@ export default function PasswordRecovery() {
       return;
     }
     
-    // Look for token and type in all possible places
     const queryToken = searchParams.get('token');
     const queryType = searchParams.get('type');
     const locationToken = location.state?.token;
@@ -88,17 +80,14 @@ export default function PasswordRecovery() {
     const hashType = new URLSearchParams(window.location.hash.substring(1)).get('type');
     const storedToken = localStorage.getItem('passwordRecoveryToken');
     
-    // Log what we found
     console.log("Query token:", queryToken ? "found" : "not found");
     console.log("Location token:", locationToken ? "found" : "not found");
     console.log("Hash token:", hashToken ? "found" : "not found");
     console.log("Stored token:", storedToken ? "found" : "not found");
     
-    // Use the first token we find
     const token = queryToken || locationToken || hashToken || storedToken;
     const type = queryType || locationType || hashType;
 
-    // Store new token if found
     if (token) {
       console.log("Found token, storing in localStorage");
       localStorage.setItem('passwordRecoveryToken', token);
@@ -163,7 +152,6 @@ export default function PasswordRecovery() {
         variant: "destructive",
       });
     } else {
-      // Clear the recovery state
       localStorage.removeItem('passwordRecoveryActive');
       localStorage.removeItem('passwordRecoveryToken');
       
@@ -172,16 +160,13 @@ export default function PasswordRecovery() {
         description: "Your password has been successfully updated. You can now sign in.",
       });
       
-      // Sign out after password reset to ensure clean authentication state
       await supabase.auth.signOut();
       
-      // Redirect to auth page
       navigate('/auth', { replace: true });
     }
     setLoading(false);
   };
 
-  // Render the password reset email request form
   const renderRequestResetForm = () => {
     return (
       <div className="space-y-4">
@@ -214,7 +199,6 @@ export default function PasswordRecovery() {
     );
   };
 
-  // Render the new password form with two password fields
   const renderNewPasswordForm = () => {
     return (
       <div className="space-y-4">
