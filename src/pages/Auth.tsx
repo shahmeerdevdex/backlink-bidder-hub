@@ -36,6 +36,7 @@ export default function Auth() {
       localStorage.setItem('passwordRecoveryActive', 'true');
       
       // Navigate to password recovery page immediately
+      console.log("Redirecting to password recovery page");
       window.location.href = '/password-recovery';
       return;
     }

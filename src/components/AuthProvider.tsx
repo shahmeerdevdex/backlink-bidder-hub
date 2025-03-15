@@ -144,12 +144,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('passwordRecoveryActive', 'true');
       console.log("Set passwordRecoveryActive to true in localStorage");
       
-      // Force navigate to the password recovery page
+      // Force reload the page after setting localStorage
       if (window.location.pathname !== '/password-recovery') {
         console.log("Redirecting to password recovery page");
         window.location.href = '/password-recovery';
       } else {
         // If already on the password recovery page, reload to apply the changes
+        console.log("Already on password recovery page, reloading");
         window.location.reload();
       }
       
