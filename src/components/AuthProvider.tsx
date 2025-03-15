@@ -104,6 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (window.location.pathname !== '/password-recovery') {
         console.log("Redirecting to password recovery page");
         window.location.href = '/password-recovery';
+      } else {
+        // If already on the password recovery page, reload to apply the changes
+        window.location.reload();
       }
       
       // Important: Don't sign out the user if they're already logged in

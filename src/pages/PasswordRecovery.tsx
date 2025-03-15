@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,6 +73,12 @@ export default function PasswordRecovery() {
       localStorage.setItem('passwordRecoveryActive', 'true');
       setAccessToken(token);
       setIsRecoveryFlow(true);
+      
+      // Reload the page to make sure all state is fresh and the AuthProvider gets the update
+      if (!tokenChecked) {
+        window.location.reload();
+        return;
+      }
       
       // Verify the token immediately to create a session
       const verifyToken = async () => {
