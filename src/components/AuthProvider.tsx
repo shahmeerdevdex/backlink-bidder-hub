@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
@@ -61,7 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       handleAuthChange(event, session?.user);
 
       // Don't update user state during PASSWORD_RECOVERY to prevent sign-out
-      if (event !== 'PASSWORD_RECOVERY') {
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log("Password recovery event detected");
+        // Don't change the user state
+      } else {
         setUser(session?.user ?? null);
         if (session?.user) {
           setIsEmailVerified(!!session.user.email_confirmed_at);
@@ -97,6 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           description: "Your account has been banned. Please contact support for more information.",
           variant: "destructive",
         });
+        // Sign out banned users automatically
+        signOut();
       }
     }
   };

@@ -50,6 +50,13 @@ export default function Auth() {
     }
   }, [toast, navigate, searchParams]);
 
+  // Check for passwordRecoveryActive and reload if needed
+  useEffect(() => {
+    if (localStorage.getItem('passwordRecoveryActive') === 'true' && window.location.pathname !== '/password-recovery') {
+      window.location.href = '/password-recovery';
+    }
+  }, []);
+
   // Redirect authenticated users
   useEffect(() => {
     if (user && !isBanned) {
@@ -121,6 +128,32 @@ export default function Auth() {
       });
     }
   };
+
+  // Show banned user message
+  if (isBanned) {
+    return (
+      <div className="container max-w-md mx-auto px-4 py-16">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-destructive">Account Banned</CardTitle>
+            <CardDescription>Your account has been banned.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center mb-4">
+              Your account has been banned. Please contact support for more information.
+            </p>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => navigate('/')}
+            >
+              Return to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-md mx-auto px-4 py-16">
