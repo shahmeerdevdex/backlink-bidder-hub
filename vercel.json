@@ -1,3 +1,13 @@
+
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/" }
+  ],
+  "redirects": [
+    { 
+      "source": "/elegant-mentions", 
+      "destination": "https://elegantmentions.com/",
+      "permanent": true
+    }
+  ]
 }

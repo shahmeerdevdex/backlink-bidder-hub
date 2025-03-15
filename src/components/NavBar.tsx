@@ -21,6 +21,10 @@ export function NavBar() {
     navigate('/');
   };
 
+  const handleElegantMentionsClick = () => {
+    window.location.href = 'https://elegantmentions.com/';
+  };
+
   return (
     <div className="border-b">
       <div className="container mx-auto px-4 py-3">
@@ -28,7 +32,7 @@ export function NavBar() {
           <div className="flex items-center">
             <div 
               className="flex items-center mr-4 cursor-pointer" 
-              onClick={() => navigate('/')}
+              onClick={handleElegantMentionsClick}
             >
               <img 
                 src="/lovable-uploads/3e02dde5-e671-4653-9d2d-b7ebef4132ad.png" 
@@ -116,4 +120,3 @@ export function NavBar() {
     </div>
   );
 }
-
