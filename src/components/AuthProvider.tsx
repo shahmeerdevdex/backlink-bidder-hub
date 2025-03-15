@@ -55,14 +55,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
       console.log("Auth state change:", event);
       handleAuthChange(event, session?.user);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setIsEmailVerified(!!session.user.email_confirmed_at);
-        checkAdminStatus(session.user.id);
-      } else {
-        setIsAdmin(false);
-        setIsEmailVerified(false);
+      
+      // Don't update user state during PASSWORD_RECOVERY to prevent sign-out
+      if (event !== 'PASSWORD_RECOVERY') {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          setIsEmailVerified(!!session.user.email_confirmed_at);
+          checkAdminStatus(session.user.id);
+        } else if (event !== 'PASSWORD_RECOVERY') {
+          // Only reset these states if not in password recovery
+          setIsAdmin(false);
+          setIsEmailVerified(false);
+        }
       }
+      
       setLoading(false);
     });
 
@@ -99,6 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Redirecting to password recovery page");
         window.location.href = '/password-recovery';
       }
+      
+      // Important: Don't sign out the user if they're already logged in
+      // Remove any automatic sign out actions here
     } else if (event === 'SIGNED_IN') {
       if (user && !user.email_confirmed_at) {
         toast({
@@ -117,9 +126,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         title: "Signed Out",
         description: "You have been signed out.",
       });
-      // Clear any recovery state when signing out
-      localStorage.removeItem('passwordRecoveryActive');
-      localStorage.removeItem('passwordRecoveryToken');
+      // Only clear recovery state if explicitly signing out
+      // Not during password recovery process
+      if (localStorage.getItem('passwordRecoveryActive') !== 'true') {
+        localStorage.removeItem('passwordRecoveryActive');
+        localStorage.removeItem('passwordRecoveryToken');
+      }
     } else if (event === 'USER_UPDATED') {
       toast({
         title: "Profile Updated",
@@ -141,6 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Don't clear recovery state if in password recovery mode
+    const inRecoveryMode = localStorage.getItem('passwordRecoveryActive') === 'true';
+    if (!inRecoveryMode) {
+      localStorage.removeItem('passwordRecoveryActive');
+      localStorage.removeItem('passwordRecoveryToken');
+    }
     await supabase.auth.signOut();
   };
 
