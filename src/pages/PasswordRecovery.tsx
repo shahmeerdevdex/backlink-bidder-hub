@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useAuth } from '@/components/AuthProvider';
 
 // Define form schema with Zod
 const passwordSchema = z.object({
@@ -35,6 +36,7 @@ export default function PasswordRecovery() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const [tokenChecked, setTokenChecked] = useState(false);
+  const { user, signOut } = useAuth();
 
   const form = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
@@ -43,6 +45,24 @@ export default function PasswordRecovery() {
       confirmPassword: '',
     },
   });
+
+  // Sign out the user if they're trying to access the password recovery page while signed in
+  useEffect(() => {
+    // Only sign out if we're actually in recovery mode
+    const storedActive = localStorage.getItem('passwordRecoveryActive');
+    const queryToken = searchParams.get('token');
+    const queryType = searchParams.get('type');
+    
+    if (user && (storedActive === 'true' || (queryToken && queryType === 'recovery'))) {
+      console.log("User is signed in but needs password recovery. Signing out first...");
+      const performSignOut = async () => {
+        await signOut();
+        // After sign out, we need to refresh the token check
+        setTokenChecked(false);
+      };
+      performSignOut();
+    }
+  }, [user, searchParams, signOut]);
 
   // Check URL parameters for password reset
   useEffect(() => {
