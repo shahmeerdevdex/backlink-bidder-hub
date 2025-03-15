@@ -26,6 +26,14 @@ export default defineConfig(({ mode }) => ({
   build: {
     commonjsOptions: {
       include: [/zod/, /node_modules/]
+    },
+    rollupOptions: {
+      external: [],
+      output: {
+        manualChunks: {
+          vendor: ['zod', 'react', 'react-dom', 'react-router-dom']
+        }
+      }
     }
   }
 }));
