@@ -56,14 +56,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Auth state change:", event);
       handleAuthChange(event, session?.user);
       
-      // Don't update user state during PASSWORD_RECOVERY to prevent sign-out
-      if (event !== 'PASSWORD_RECOVERY') {
+      // Check if we're in a password recovery flow using URL parameters
+      const url = new URL(window.location.href);
+      const isPasswordRecovery = 
+        url.searchParams.has('token') || 
+        new URLSearchParams(window.location.hash.substring(1)).has('token') ||
+        url.hash.includes('token=') ||
+        localStorage.getItem('passwordRecoveryActive') === 'true';
+      
+      // Don't update user state during password recovery to prevent sign-out
+      if (!isPasswordRecovery) {
         setUser(session?.user ?? null);
         if (session?.user) {
           setIsEmailVerified(!!session.user.email_confirmed_at);
           checkAdminStatus(session.user.id);
-        } else if (event !== 'PASSWORD_RECOVERY') {
-          // Only reset these states if not in password recovery
+        } else {
           setIsAdmin(false);
           setIsEmailVerified(false);
         }
@@ -76,7 +83,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleAuthChange = (event: AuthChangeEvent, user: User | null) => {
-    if (event === 'PASSWORD_RECOVERY') {
+    // Check if we're in a password recovery flow using the URL or local storage
+    const url = new URL(window.location.href);
+    const isPasswordRecovery = 
+      url.searchParams.has('token') || 
+      new URLSearchParams(window.location.hash.substring(1)).has('token') ||
+      url.hash.includes('token=');
+    
+    if (isPasswordRecovery) {
       console.log("Password recovery event detected");
       toast({
         title: "Password Recovery",
@@ -84,7 +98,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       // Extract token from all possible places in the URL
-      const url = new URL(window.location.href);
       const token = url.searchParams.get('token') || 
                     new URLSearchParams(window.location.hash.substring(1)).get('token') ||
                     url.hash.match(/token=([^&]*)/)?.[1];
@@ -110,7 +123,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Important: Don't sign out the user if they're already logged in
-      // Remove any automatic sign out actions here
     } else if (event === 'SIGNED_IN') {
       if (user && !user.email_confirmed_at) {
         toast({
