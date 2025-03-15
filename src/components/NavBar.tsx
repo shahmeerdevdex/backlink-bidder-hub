@@ -9,7 +9,7 @@ import {
   NavigationMenuList,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
-import { LogOut, Home, ShoppingBag, User, Users, Award } from 'lucide-react';
+import { LogOut, Home, ShoppingBag, User, Users } from 'lucide-react';
 import { Notifications } from '@/components/Notifications';
 
 export function NavBar() {
@@ -30,8 +30,12 @@ export function NavBar() {
               className="flex items-center mr-4 cursor-pointer" 
               onClick={() => navigate('/')}
             >
-              <Award className="w-6 h-6 text-primary mr-2" />
-              <span className="font-bold text-xl">BidderHub</span>
+              <img 
+                src="/lovable-uploads/3e02dde5-e671-4653-9d2d-b7ebef4132ad.png" 
+                alt="Elegant Mentions Logo" 
+                className="h-10 mr-2" 
+              />
+              <span className="font-bold text-xl text-purple-900">Elegant Mentions</span>
             </div>
             
             <NavigationMenu>
@@ -112,3 +116,4 @@ export function NavBar() {
     </div>
   );
 }
+
