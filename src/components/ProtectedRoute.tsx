@@ -106,6 +106,11 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
   }
 
   if (adminOnly && !isAdmin) {
+    toast({
+      title: "Access Denied",
+      description: "Only administrators can access this page.",
+      variant: "destructive",
+    });
     return <Navigate to="/" replace />;
   }
 

@@ -72,15 +72,17 @@ export function NavBar() {
                       </NavigationMenuLink>
                     </NavigationMenuItem>
                     
-                    <NavigationMenuItem>
-                      <NavigationMenuLink
-                        className={navigationMenuTriggerStyle()}
-                        onClick={() => navigate('/my-auctions')}
-                      >
-                        <ShoppingBag className="w-4 h-4 mr-2" />
-                        My Auctions
-                      </NavigationMenuLink>
-                    </NavigationMenuItem>
+                    {isAdmin && (
+                      <NavigationMenuItem>
+                        <NavigationMenuLink
+                          className={navigationMenuTriggerStyle()}
+                          onClick={() => navigate('/my-auctions')}
+                        >
+                          <ShoppingBag className="w-4 h-4 mr-2" />
+                          My Auctions
+                        </NavigationMenuLink>
+                      </NavigationMenuItem>
+                    )}
 
                     {isAdmin && (
                       <NavigationMenuItem>

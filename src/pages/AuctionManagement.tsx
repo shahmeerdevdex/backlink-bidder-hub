@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Pencil, Trash2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { format } from 'date-fns';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 interface AuctionForm {
   title: string;
@@ -43,7 +44,7 @@ export default function AuctionManagement() {
     max_spots: '',
     ends_at: '',
   });
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -74,7 +75,7 @@ export default function AuctionManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !isAdmin) return;
 
     setIsSubmitting(true);
 
@@ -161,6 +162,8 @@ export default function AuctionManagement() {
   };
 
   const handleDelete = async (auctionId: string) => {
+    if (!isAdmin) return;
+    
     const { error } = await supabase
       .from('auctions')
       .delete()
@@ -184,6 +187,8 @@ export default function AuctionManagement() {
   };
 
   const startEdit = (auction: Auction) => {
+    if (!isAdmin) return;
+    
     setEditingAuction(auction);
     setForm({
       title: auction.title,
@@ -196,166 +201,181 @@ export default function AuctionManagement() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Manage Your Auctions</h1>
-        <Button 
-          onClick={() => {
-            setIsCreating(!isCreating);
-            setEditingAuction(null);
-            if (!isCreating) {
-              setForm({
-                title: '',
-                description: '',
-                starting_price: '',
-                max_spots: '',
-                ends_at: '',
-              });
-            }
-          }}
-        >
-          {isCreating ? "Cancel" : "Create New Auction"}
-        </Button>
-      </div>
+    <ProtectedRoute adminOnly={true}>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Manage Your Auctions</h1>
+          {isAdmin && (
+            <Button 
+              onClick={() => {
+                setIsCreating(!isCreating);
+                setEditingAuction(null);
+                if (!isCreating) {
+                  setForm({
+                    title: '',
+                    description: '',
+                    starting_price: '',
+                    max_spots: '',
+                    ends_at: '',
+                  });
+                }
+              }}
+            >
+              {isCreating ? "Cancel" : "Create New Auction"}
+            </Button>
+          )}
+        </div>
 
-      {isCreating && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>{editingAuction ? "Edit Auction" : "Create New Auction"}</CardTitle>
-          </CardHeader>
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Title</label>
-                <Input
-                  required
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="Enter auction title"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <Textarea
-                  required
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Enter auction description"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Starting Price ($)</label>
-                <Input
-                  required
-                  type="number"
-                  min="1"
-                  value={form.starting_price}
-                  onChange={(e) => setForm({ ...form, starting_price: e.target.value })}
-                  placeholder="Enter starting price"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Maximum Spots</label>
-                <Input
-                  required
-                  type="number"
-                  min="1"
-                  value={form.max_spots}
-                  onChange={(e) => setForm({ ...form, max_spots: e.target.value })}
-                  placeholder="Enter maximum number of spots"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">End Date & Time</label>
-                <Input
-                  required
-                  type="datetime-local"
-                  value={form.ends_at}
-                  onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
-                  min={format(new Date(), "yyyy-MM-dd'T'HH:mm")}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {editingAuction ? "Updating..." : "Creating..."}
-                  </>
-                ) : (
-                  editingAuction ? "Update Auction" : "Create Auction"
-                )}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {myAuctions.map((auction) => (
-          <Card key={auction.id} className="flex flex-col">
+        {isCreating && isAdmin && (
+          <Card className="mb-8">
             <CardHeader>
-              <CardTitle className="flex justify-between items-start">
-                <span className="text-xl font-bold">{auction.title}</span>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => startEdit(auction)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => handleDelete(auction.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardTitle>
+              <CardTitle>{editingAuction ? "Edit Auction" : "Create New Auction"}</CardTitle>
             </CardHeader>
-            <CardContent className="flex-grow">
-              <p className="text-sm text-muted-foreground mb-4">{auction.description}</p>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Starting Price</span>
-                  <span className="font-semibold">${auction.starting_price}</span>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Title</label>
+                  <Input
+                    required
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="Enter auction title"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span>Current Price</span>
-                  <span className="font-semibold">${auction.current_price}</span>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Description</label>
+                  <Textarea
+                    required
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="Enter auction description"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span>Spots</span>
-                  <span className="font-semibold">{auction.filled_spots}/{auction.max_spots}</span>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Starting Price ($)</label>
+                  <Input
+                    required
+                    type="number"
+                    min="1"
+                    value={form.starting_price}
+                    onChange={(e) => setForm({ ...form, starting_price: e.target.value })}
+                    placeholder="Enter starting price"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span>Ends At</span>
-                  <span className="font-semibold">
-                    {format(new Date(auction.ends_at), 'PPp')}
-                  </span>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Maximum Spots</label>
+                  <Input
+                    required
+                    type="number"
+                    min="1"
+                    value={form.max_spots}
+                    onChange={(e) => setForm({ ...form, max_spots: e.target.value })}
+                    placeholder="Enter maximum number of spots"
+                  />
                 </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                className="w-full" 
-                variant="outline"
-                onClick={() => navigate(`/auctions/${auction.id}`)}
-              >
-                View Details
-              </Button>
-            </CardFooter>
+                <div>
+                  <label className="block text-sm font-medium mb-1">End Date & Time</label>
+                  <Input
+                    required
+                    type="datetime-local"
+                    value={form.ends_at}
+                    onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+                    min={format(new Date(), "yyyy-MM-dd'T'HH:mm")}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {editingAuction ? "Updating..." : "Creating..."}
+                    </>
+                  ) : (
+                    editingAuction ? "Update Auction" : "Create Auction"
+                  )}
+                </Button>
+              </CardFooter>
+            </form>
           </Card>
-        ))}
-        {myAuctions.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            You haven't created any auctions yet.
+        )}
+
+        {!isAdmin && (
+          <div className="text-center py-8 mb-8 bg-amber-50 border border-amber-200 rounded-lg">
+            <h2 className="text-xl font-semibold text-amber-800 mb-2">Admin Access Required</h2>
+            <p className="text-amber-700">
+              Only administrators can create and manage auctions. Please contact an administrator if you need assistance.
+            </p>
           </div>
         )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {myAuctions.map((auction) => (
+            <Card key={auction.id} className="flex flex-col">
+              <CardHeader>
+                <CardTitle className="flex justify-between items-start">
+                  <span className="text-xl font-bold">{auction.title}</span>
+                  {isAdmin && (
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => startEdit(auction)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => handleDelete(auction.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <p className="text-sm text-muted-foreground mb-4">{auction.description}</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Starting Price</span>
+                    <span className="font-semibold">${auction.starting_price}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Current Price</span>
+                    <span className="font-semibold">${auction.current_price}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Spots</span>
+                    <span className="font-semibold">{auction.filled_spots}/{auction.max_spots}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Ends At</span>
+                    <span className="font-semibold">
+                      {format(new Date(auction.ends_at), 'PPp')}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button 
+                  className="w-full" 
+                  variant="outline"
+                  onClick={() => navigate(`/auctions/${auction.id}`)}
+                >
+                  View Details
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+          {myAuctions.length === 0 && (
+            <div className="col-span-full text-center py-12 text-muted-foreground">
+              {isAdmin ? "You haven't created any auctions yet." : "You don't have access to create or manage auctions."}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }
