@@ -168,13 +168,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    // Don't clear recovery state if in password recovery mode
-    const inRecoveryMode = localStorage.getItem('passwordRecoveryActive') === 'true';
-    if (!inRecoveryMode) {
-      localStorage.removeItem('passwordRecoveryActive');
-      localStorage.removeItem('passwordRecoveryToken');
+    try {
+      console.log("Signing out...");
+      
+      // Don't clear recovery state if in password recovery mode
+      const inRecoveryMode = localStorage.getItem('passwordRecoveryActive') === 'true';
+      if (!inRecoveryMode) {
+        localStorage.removeItem('passwordRecoveryActive');
+        localStorage.removeItem('passwordRecoveryToken');
+      }
+      
+      // Perform the sign out
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("Sign out error:", error);
+        toast({
+          title: "Sign Out Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log("Sign out successful");
+        
+        // Force refresh the page to ensure auth state is completely reset
+        window.location.href = '/';
+      }
+    } catch (err) {
+      console.error("Unexpected error during sign out:", err);
+      toast({
+        title: "Sign Out Failed",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
     }
-    await supabase.auth.signOut();
   };
 
   return (

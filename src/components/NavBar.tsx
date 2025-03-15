@@ -16,9 +16,15 @@ export function NavBar() {
   const navigate = useNavigate();
   const { user, isAdmin, signOut } = useAuth();
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent default navigation
+    console.log("Sign out button clicked");
+    try {
+      await signOut();
+      // Navigation is handled in the signOut function itself
+    } catch (error) {
+      console.error("Error in handleSignOut:", error);
+    }
   };
 
   const handleElegantMentionsClick = () => {
