@@ -20,18 +20,11 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  optimizeDeps: {
-    include: ['zod']
-  },
   build: {
-    commonjsOptions: {
-      include: [/zod/, /node_modules/]
-    },
     rollupOptions: {
-      external: [],
       output: {
         manualChunks: {
-          vendor: ['zod', 'react', 'react-dom', 'react-router-dom']
+          vendor: ['react', 'react-dom', 'react-router-dom']
         }
       }
     }

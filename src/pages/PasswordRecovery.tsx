@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,20 +9,13 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { z } from 'zod';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/components/AuthProvider';
 
-const passwordSchema = z.object({
-  password: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
-  confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-type PasswordFormValues = z.infer<typeof passwordSchema>;
+interface PasswordFormValues {
+  password: string;
+  confirmPassword: string;
+}
 
 export default function PasswordRecovery() {
   const [loading, setLoading] = useState(false);
@@ -37,7 +31,6 @@ export default function PasswordRecovery() {
   const { user, signOut } = useAuth();
 
   const form = useForm<PasswordFormValues>({
-    resolver: zodResolver(passwordSchema),
     defaultValues: {
       password: '',
       confirmPassword: '',
@@ -129,13 +122,42 @@ export default function PasswordRecovery() {
     setLoading(false);
   };
 
+  const validatePasswords = (password: string, confirmPassword: string) => {
+    const errors: Partial<PasswordFormValues> = {};
+    
+    if (password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long';
+    }
+    
+    if (confirmPassword.length < 6) {
+      errors.confirmPassword = 'Password must be at least 6 characters long';
+    }
+    
+    if (password !== confirmPassword) {
+      errors.confirmPassword = "Passwords don't match";
+    }
+    
+    return errors;
+  };
+
   const onSubmit = async (data: PasswordFormValues) => {
-    if (data.password !== data.confirmPassword) {
-      toast({
-        title: "Passwords Don't Match",
-        description: "Please make sure your passwords match.",
-        variant: "destructive",
-      });
+    const errors = validatePasswords(data.password, data.confirmPassword);
+    
+    if (errors.password || errors.confirmPassword) {
+      if (errors.password) {
+        form.setError('password', { 
+          type: 'manual', 
+          message: errors.password 
+        });
+      }
+      
+      if (errors.confirmPassword) {
+        form.setError('confirmPassword', { 
+          type: 'manual', 
+          message: errors.confirmPassword
+        });
+      }
+      
       return;
     }
 
