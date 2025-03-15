@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,7 +19,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isBanned } = useAuth();
   const [searchParams] = useSearchParams();
   
   // Check URL parameters for email verification and recovery token
@@ -51,11 +52,11 @@ export default function Auth() {
 
   // Redirect authenticated users
   useEffect(() => {
-    if (user) {
+    if (user && !isBanned) {
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
-  }, [user, navigate, location]);
+  }, [user, isBanned, navigate, location]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +90,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error, data } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
