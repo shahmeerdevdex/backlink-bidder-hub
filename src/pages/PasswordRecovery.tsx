@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -73,13 +74,54 @@ export default function PasswordRecovery() {
       setAccessToken(token);
       setIsRecoveryFlow(true);
       
-      console.log("Reloading page to refresh state");
-      window.location.reload();
-      return;
+      // Reload the page to make sure all state is fresh and the AuthProvider gets the update
+      if (!tokenChecked) {
+        window.location.reload();
+        return;
+      }
+      
+      // Verify the token immediately to create a session
+      const verifyToken = async () => {
+        try {
+          console.log("Verifying recovery token:", token);
+          // Use setSession to set the recovery token
+          const { error } = await supabase.auth.setSession({
+            access_token: token,
+            refresh_token: '',
+          });
+          
+          if (error) {
+            console.error("Error verifying token:", error);
+            toast({
+              title: "Invalid or Expired Link",
+              description: "The password reset link is invalid or has expired. Please request a new one.",
+              variant: "destructive",
+            });
+            setIsRecoveryFlow(false);
+          } else {
+            console.log("Token verified successfully");
+            toast({
+              title: "Password Reset",
+              description: "Please enter your new password.",
+            });
+          }
+        } catch (error) {
+          console.error("Exception verifying token:", error);
+          toast({
+            title: "Error",
+            description: "An unexpected error occurred. Please try again.",
+            variant: "destructive",
+          });
+          setIsRecoveryFlow(false);
+        }
+      };
+      
+      verifyToken();
+    } else {
+      console.log("No recovery parameters found, showing email form");
+      setIsRecoveryFlow(false);
     }
     
-    console.log("No recovery parameters found, showing email form");
-    setIsRecoveryFlow(false);
     setTokenChecked(true);
   }, [location, toast, searchParams, tokenChecked]);
 
@@ -87,43 +129,23 @@ export default function PasswordRecovery() {
     e.preventDefault();
     setLoading(true);
     
-    try {
-      console.log("Requesting password reset for:", email);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/password-recovery`,
-      });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/password-recovery`,
+    });
 
-      if (error) {
-        console.error("Password reset request error:", error);
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        console.log("Password reset email sent successfully");
-        toast({
-          title: "Recovery Email Sent",
-          description: "Check your email for the password reset link.",
-        });
-        
-        localStorage.setItem('passwordRecoveryActive', 'true');
-        
-        setTimeout(() => {
-          console.log("Reloading page after reset email sent");
-          window.location.reload();
-        }, 1500);
-      }
-    } catch (err) {
-      console.error("Unexpected error during password reset request:", err);
+    if (error) {
       toast({
         title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: error.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
+    } else {
+      toast({
+        title: "Recovery Email Sent",
+        description: "Check your email for the password reset link.",
+      });
     }
+    setLoading(false);
   };
 
   const validatePasswords = (password: string, confirmPassword: string) => {
@@ -170,6 +192,7 @@ export default function PasswordRecovery() {
     try {
       console.log("Updating password...");
       
+      // Use the update user API 
       const { error } = await supabase.auth.updateUser({
         password: data.password,
       });
@@ -191,6 +214,7 @@ export default function PasswordRecovery() {
           description: "Your password has been successfully updated. You can now sign in.",
         });
         
+        // Sign out to ensure clean state
         await supabase.auth.signOut();
         
         navigate('/auth', { replace: true });
