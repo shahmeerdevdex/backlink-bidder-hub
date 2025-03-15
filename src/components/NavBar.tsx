@@ -9,7 +9,7 @@ import {
   NavigationMenuList,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
-import { LogOut, Home, ShoppingBag, User, Users } from 'lucide-react';
+import { LogOut, Flame, ShoppingBag, User, Users } from 'lucide-react';
 import { Notifications } from '@/components/Notifications';
 
 export function NavBar() {
@@ -49,8 +49,8 @@ export function NavBar() {
                     className={navigationMenuTriggerStyle()}
                     onClick={() => navigate('/')}
                   >
-                    <Home className="w-4 h-4 mr-2" />
-                    Home
+                    <Flame className="w-4 h-4 mr-2" />
+                    Active Auction
                   </NavigationMenuLink>
                 </NavigationMenuItem>
                 
