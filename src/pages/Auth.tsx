@@ -1,192 +1,231 @@
-
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Github } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
 
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  isAdmin: boolean;
-  isEmailVerified: boolean;
-  signOut: () => Promise<void>;
-  refreshSession: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  isAdmin: false,
-  isEmailVerified: false,
-  signOut: async () => {},
-  refreshSession: async () => {}
-});
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isEmailVerified, setIsEmailVerified] = useState(false);
+export default function Auth() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('signin');
+  const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
-
-  const refreshSession = async () => {
-    const { data, error } = await supabase.auth.refreshSession();
-    if (data.session) {
-      setUser(data.session.user);
-      setIsEmailVerified(!!data.session.user.email_confirmed_at);
-      if (data.session.user) {
-        checkAdminStatus(data.session.user.id);
-      }
-    }
-  };
-
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  
+  // Check URL parameters for email verification and recovery token
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setIsEmailVerified(!!session.user.email_confirmed_at);
-        checkAdminStatus(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
-      console.log("Auth state change:", event);
-      handleAuthChange(event, session?.user);
-
-      // Don't update user state during PASSWORD_RECOVERY to prevent sign-out
-      if (event !== 'PASSWORD_RECOVERY') {
-
-
-
-
-
-
-
-
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setIsEmailVerified(!!session.user.email_confirmed_at);
-          checkAdminStatus(session.user.id);
-        } else if (event !== 'PASSWORD_RECOVERY') {
-          // Only reset these states if not in password recovery
-          setIsAdmin(false);
-          setIsEmailVerified(false);
-        }
-      }
-
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleAuthChange = (event: AuthChangeEvent, user: User | null) => {
-    if (event === 'PASSWORD_RECOVERY') {
-
-
-
-
-
-
-
-      console.log("Password recovery event detected");
-      toast({
-        title: "Password Recovery",
-        description: "You can now reset your password.",
-      });
-
-      // Extract token from all possible places in the URL
-      const url = new URL(window.location.href);
-      const token = url.searchParams.get('token') || 
-                    new URLSearchParams(window.location.hash.substring(1)).get('token') ||
-                    url.hash.match(/token=([^&]*)/)?.[1];
-
-      console.log("Found recovery token:", token ? "yes" : "no");
-
-      if (token) {
-        localStorage.setItem('passwordRecoveryToken', token);
-        console.log("Stored recovery token in localStorage");
-      }
-
-      // Always set the recovery state to true when this event is triggered
+    // Parse the URL to check for recovery token
+    const token = searchParams.get('token');
+    const type = searchParams.get('type');
+    
+    // Check for password reset token
+    if (type === 'recovery' && token) {
+      console.log("Recovery link detected with token, redirecting to password recovery page");
+      
+      // Store the token in localStorage before redirecting
+      localStorage.setItem('passwordRecoveryToken', token);
       localStorage.setItem('passwordRecoveryActive', 'true');
-      console.log("Set passwordRecoveryActive to true in localStorage");
-
-      // Force navigate to the password recovery page
-      if (window.location.pathname !== '/password-recovery') {
-        console.log("Redirecting to password recovery page");
-        window.location.href = '/password-recovery';
-      } else {
-        // If already on the password recovery page, reload to apply the changes
-        window.location.reload();
-      }
-
-      // Important: Don't sign out the user if they're already logged in
-      // Remove any automatic sign out actions here
-    } else if (event === 'SIGNED_IN') {
-      if (user && !user.email_confirmed_at) {
-        toast({
-          title: "Email Not Verified",
-          description: "Please check your email to verify your account.",
-          variant: "destructive",
-        });
-      } else if (user) {
-        toast({
-          title: "Welcome Back",
-          description: `Signed in as ${user.email}`,
-        });
-      }
-    } else if (event === 'SIGNED_OUT') {
+      
+      // Navigate to password recovery page immediately
+      window.location.href = '/password-recovery';
+      return;
+    }
+    
+    // Check for email verification success
+    if (type === 'signup') {
       toast({
-        title: "Signed Out",
-        description: "You have been signed out.",
-      });
-      // Only clear recovery state if explicitly signing out
-      // Not during password recovery process
-      if (localStorage.getItem('passwordRecoveryActive') !== 'true') {
-        localStorage.removeItem('passwordRecoveryActive');
-        localStorage.removeItem('passwordRecoveryToken');
-      }
-    } else if (event === 'USER_UPDATED') {
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been updated successfully.",
+        title: "Email Verified",
+        description: "Your email has been verified. You can now sign in.",
       });
     }
+  }, [toast, navigate, searchParams]);
+
+  // Redirect authenticated users
+  useEffect(() => {
+    if (user) {
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    }
+  }, [user, navigate, location]);
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    const { error, data } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth`,
+      }
+    });
+
+    if (error) {
+      toast({
+        title: "Error signing up",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Success!",
+        description: "Please check your email to confirm your account. Don't forget to check your spam folder.",
+      });
+      setActiveTab('signin');
+    }
+    setLoading(false);
   };
 
-  const checkAdminStatus = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', userId)
-      .single();
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (!error && data) {
-      setIsAdmin(data.is_admin);
+    if (error) {
+      toast({
+        title: "Error signing in",
+        description: error.message,
+        variant: "destructive",
+      });
     }
+    setLoading(false);
   };
 
-  const signOut = async () => {
-    // Don't clear recovery state if in password recovery mode
-    const inRecoveryMode = localStorage.getItem('passwordRecoveryActive') === 'true';
-    if (!inRecoveryMode) {
-      localStorage.removeItem('passwordRecoveryActive');
-      localStorage.removeItem('passwordRecoveryToken');
+  const handleGithubLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: `${window.location.origin}/auth`,
+      }
+    });
+
+    if (error) {
+      toast({
+        title: "Error signing in with GitHub",
+        description: error.message,
+        variant: "destructive",
+      });
     }
-    await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isEmailVerified, signOut, refreshSession }}>
-      {children}
-    </AuthContext.Provider>
+    <div className="container max-w-md mx-auto px-4 py-16">
+      <Card>
+        <CardHeader>
+          <CardTitle>Welcome to Auction App</CardTitle>
+          <CardDescription>Sign in to start bidding on auctions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="signin">Sign In</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="signin">
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signin-email">Email</Label>
+                  <Input
+                    id="signin-email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signin-password">Password</Label>
+                  <Input
+                    id="signin-password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Button>
+                <div className="text-center mt-2">
+                  <Button 
+                    variant="link" 
+                    type="button" 
+                    onClick={() => navigate('/password-recovery')}
+                    className="text-sm text-muted-foreground"
+                  >
+                    Forgot your password?
+                  </Button>
+                </div>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="signup">
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password</Label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    placeholder="Create a password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Signing up...' : 'Sign Up'}
+                </Button>
+                <div className="text-center mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    By signing up, you will need to verify your email before you can sign in.
+                  </p>
+                </div>
+              </form>
+            </TabsContent>
+          </Tabs>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+            </div>
+          </div>
+
+          <Button variant="outline" className="w-full" onClick={handleGithubLogin}>
+            <Github className="mr-2 h-4 w-4" />
+            GitHub
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
-
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
