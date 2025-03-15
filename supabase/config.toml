@@ -35,7 +35,7 @@ double_confirm_changes = true
 enable_confirmations = false
 
 [email]
-# Add custom email templates
+# Configure email templates
 templates = { 
   confirmation = """<h2>Welcome to Our Application</h2>
 <p>Thank you for signing up. Please confirm your email by clicking the link below:</p>

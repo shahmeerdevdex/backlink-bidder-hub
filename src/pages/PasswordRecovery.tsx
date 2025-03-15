@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -129,23 +128,36 @@ export default function PasswordRecovery() {
     e.preventDefault();
     setLoading(true);
     
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/password-recovery`,
-    });
-
-    if (error) {
+    try {
+      console.log("Sending password reset email to:", email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/password-recovery`,
+      });
+      
+      if (error) {
+        console.error("Error sending reset email:", error);
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log("Reset email sent successfully");
+        toast({
+          title: "Recovery Email Sent",
+          description: "Check your email for the password reset link.",
+        });
+      }
+    } catch (error) {
+      console.error("Exception during password reset:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: "An unexpected error occurred. Please try again later.",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Recovery Email Sent",
-        description: "Check your email for the password reset link.",
-      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const validatePasswords = (password: string, confirmPassword: string) => {
