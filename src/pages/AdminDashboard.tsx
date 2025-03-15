@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { UserCog, Ban, CheckCircle } from 'lucide-react';
+import { UserCog, Ban, CheckCircle, UserCheck } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -13,12 +13,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface User {
   id: string;
   email: string;
   is_admin: boolean;
   created_at: string;
+  is_banned: boolean;
+  banned_at: string | null;
+  banned_reason: string | null;
 }
 
 interface AuctionStats {
@@ -30,6 +43,9 @@ interface AuctionStats {
 export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<AuctionStats>({ total: 0, active: 0, completed: 0 });
+  const [banReason, setBanReason] = useState('');
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -100,6 +116,70 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  const handleBanUser = (userId: string) => {
+    setSelectedUserId(userId);
+    setBanReason('');
+    setBanDialogOpen(true);
+  };
+
+  const handleUnbanUser = async (userId: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        is_banned: false,
+        banned_at: null,
+        banned_reason: null
+      })
+      .eq('id', userId);
+
+    if (error) {
+      toast({
+        title: "Error unbanning user",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Success",
+      description: "User has been unbanned",
+    });
+
+    fetchUsers();
+  };
+
+  const confirmBanUser = async () => {
+    if (!selectedUserId) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        is_banned: true,
+        banned_at: new Date().toISOString(),
+        banned_reason: banReason || 'Banned by administrator'
+      })
+      .eq('id', selectedUserId);
+
+    if (error) {
+      toast({
+        title: "Error banning user",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Success",
+        description: "User has been banned",
+      });
+      fetchUsers();
+    }
+
+    setBanDialogOpen(false);
+    setSelectedUserId(null);
+    setBanReason('');
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
@@ -142,6 +222,7 @@ export default function AdminDashboard() {
                 <TableHead>Email</TableHead>
                 <TableHead>Created At</TableHead>
                 <TableHead>Admin Status</TableHead>
+                <TableHead>Ban Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -164,10 +245,22 @@ export default function AdminDashboard() {
                     )}
                   </TableCell>
                   <TableCell>
+                    {user.is_banned ? (
+                      <span className="flex items-center text-red-600">
+                        <Ban className="w-4 h-4 mr-1" /> Banned
+                      </span>
+                    ) : (
+                      <span className="flex items-center text-green-600">
+                        <UserCheck className="w-4 h-4 mr-1" /> Active
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="space-x-2">
                     <Button
                       variant={user.is_admin ? "destructive" : "default"}
                       size="sm"
                       onClick={() => toggleAdminStatus(user.id, user.is_admin)}
+                      className="mb-2 md:mb-0"
                     >
                       {user.is_admin ? (
                         <>
@@ -181,6 +274,28 @@ export default function AdminDashboard() {
                         </>
                       )}
                     </Button>
+                    
+                    {user.is_banned ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUnbanUser(user.id)}
+                        className="whitespace-nowrap"
+                      >
+                        <UserCheck className="w-4 h-4 mr-1" />
+                        Unban User
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleBanUser(user.id)}
+                        className="whitespace-nowrap"
+                      >
+                        <Ban className="w-4 h-4 mr-1" />
+                        Ban User
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -188,6 +303,37 @@ export default function AdminDashboard() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={banDialogOpen} onOpenChange={setBanDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ban User</DialogTitle>
+            <DialogDescription>
+              This action will prevent the user from logging in and using the platform. Provide a reason for the ban.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label htmlFor="banReason" className="block text-sm font-medium mb-2">
+              Ban Reason
+            </label>
+            <Textarea
+              id="banReason"
+              placeholder="Enter the reason for banning this user"
+              value={banReason}
+              onChange={(e) => setBanReason(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBanDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmBanUser}>
+              Ban User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

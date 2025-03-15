@@ -13,7 +13,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
-  const { user, loading, isAdmin, isEmailVerified } = useAuth();
+  const { user, loading, isAdmin, isEmailVerified, isBanned } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showVerificationDialog, setShowVerificationDialog] = useState(!isEmailVerified);
@@ -57,6 +57,20 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
   if (!user) {
     // Save the attempted URL to redirect back after login
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  if (isBanned) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <div className="max-w-md mx-auto p-6 bg-destructive/10 rounded-lg border border-destructive">
+          <h1 className="text-2xl font-bold text-destructive mb-4">Account Banned</h1>
+          <p className="mb-6">Your account has been banned. Please contact support for more information.</p>
+          <Button variant="outline" onClick={() => navigate('/')}>
+            Return Home
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (!isEmailVerified) {

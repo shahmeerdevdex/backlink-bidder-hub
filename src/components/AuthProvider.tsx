@@ -9,6 +9,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isEmailVerified: boolean;
+  isBanned: boolean;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isEmailVerified: false,
+  isBanned: false,
   signOut: async () => {},
   refreshSession: async () => {}
 });
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
   const { toast } = useToast();
 
   const refreshSession = async () => {
@@ -35,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.session.user);
       setIsEmailVerified(!!data.session.user.email_confirmed_at);
       if (data.session.user) {
-        checkAdminStatus(data.session.user.id);
+        checkUserStatus(data.session.user.id);
       }
     }
   };
@@ -45,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         setIsEmailVerified(!!session.user.email_confirmed_at);
-        checkAdminStatus(session.user.id);
+        checkUserStatus(session.user.id);
       }
       setLoading(false);
     });
@@ -69,10 +72,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         if (session?.user) {
           setIsEmailVerified(!!session.user.email_confirmed_at);
-          checkAdminStatus(session.user.id);
+          checkUserStatus(session.user.id);
         } else {
           setIsAdmin(false);
           setIsEmailVerified(false);
+          setIsBanned(false);
         }
       }
       
@@ -81,6 +85,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const checkUserStatus = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('is_admin, is_banned')
+      .eq('id', userId)
+      .single();
+
+    if (!error && data) {
+      setIsAdmin(data.is_admin);
+      setIsBanned(data.is_banned);
+      
+      // If the user is banned, sign them out and show a notification
+      if (data.is_banned) {
+        toast({
+          title: "Account Banned",
+          description: "Your account has been banned. Please contact support for more information.",
+          variant: "destructive",
+        });
+        
+        // Force sign out after showing the toast
+        setTimeout(() => {
+          signOut();
+        }, 2000);
+      }
+    }
+  };
 
   const handleAuthChange = (event: AuthChangeEvent, user: User | null) => {
     // Check if we're in a password recovery flow using the URL or local storage
@@ -155,18 +186,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const checkAdminStatus = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', userId)
-      .single();
-
-    if (!error && data) {
-      setIsAdmin(data.is_admin);
-    }
-  };
-
   const signOut = async () => {
     try {
       console.log("Signing out...");
@@ -205,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isEmailVerified, signOut, refreshSession }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isEmailVerified, isBanned, signOut, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );
