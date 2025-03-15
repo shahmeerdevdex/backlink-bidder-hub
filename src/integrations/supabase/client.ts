@@ -14,10 +14,7 @@ export const supabase = createClient<Database>(
   SUPABASE_PUBLISHABLE_KEY,
   {
     auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storageKey: 'supabase.auth.token'
+      persistSession: true
     }
   }
 );
@@ -32,26 +29,6 @@ supabase.functions.invoke = async function(functionName, options) {
     return result;
   } catch (error) {
     console.error(`Error invoking function ${functionName}:`, error);
-    throw error;
-  }
-};
-
-// Debug auth operation failures
-supabase.auth.onAuthStateChange((event, session) => {
-  console.log("Auth state change event:", event);
-  console.log("Session active:", !!session);
-});
-
-// Add error handling for auth operations
-const originalResetPasswordForEmail = supabase.auth.resetPasswordForEmail;
-supabase.auth.resetPasswordForEmail = async function(email, options) {
-  console.log(`Requesting password reset for email: ${email}`, options);
-  try {
-    const result = await originalResetPasswordForEmail.call(this, email, options);
-    console.log(`Password reset request result:`, result);
-    return result;
-  } catch (error) {
-    console.error(`Error requesting password reset:`, error);
     throw error;
   }
 };
