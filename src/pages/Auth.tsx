@@ -21,27 +21,21 @@ export default function Auth() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   
-  // Check URL parameters for email verification and recovery token
   useEffect(() => {
-    // Parse the URL to check for recovery token
     const token = searchParams.get('token');
     const type = searchParams.get('type');
     
-    // Check for password reset token
     if (type === 'recovery' && token) {
       console.log("Recovery link detected with token, redirecting to password recovery page");
       
-      // Store the token in localStorage before redirecting
       localStorage.setItem('passwordRecoveryToken', token);
       localStorage.setItem('passwordRecoveryActive', 'true');
       
-      // Navigate to password recovery page immediately
       console.log("Redirecting to password recovery page");
       window.location.href = '/password-recovery';
       return;
     }
     
-    // Check for email verification success
     if (type === 'signup') {
       toast({
         title: "Email Verified",
@@ -50,7 +44,6 @@ export default function Auth() {
     }
   }, [toast, navigate, searchParams]);
 
-  // Redirect authenticated users
   useEffect(() => {
     if (user) {
       const from = location.state?.from?.pathname || '/';
@@ -167,7 +160,11 @@ export default function Auth() {
                   <Button 
                     variant="link" 
                     type="button" 
-                    onClick={() => navigate('/password-recovery')}
+                    onClick={() => {
+                      localStorage.removeItem('passwordRecoveryActive');
+                      localStorage.removeItem('passwordRecoveryToken');
+                      navigate('/password-recovery');
+                    }}
                     className="text-sm text-muted-foreground"
                   >
                     Forgot your password?

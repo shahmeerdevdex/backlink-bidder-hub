@@ -87,23 +87,43 @@ export default function PasswordRecovery() {
     e.preventDefault();
     setLoading(true);
     
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/password-recovery`,
-    });
+    try {
+      console.log("Requesting password reset for:", email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/password-recovery`,
+      });
 
-    if (error) {
+      if (error) {
+        console.error("Password reset request error:", error);
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log("Password reset email sent successfully");
+        toast({
+          title: "Recovery Email Sent",
+          description: "Check your email for the password reset link.",
+        });
+        
+        localStorage.setItem('passwordRecoveryActive', 'true');
+        
+        setTimeout(() => {
+          console.log("Reloading page after reset email sent");
+          window.location.reload();
+        }, 1500);
+      }
+    } catch (err) {
+      console.error("Unexpected error during password reset request:", err);
       toast({
         title: "Error",
-        description: error.message,
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Recovery Email Sent",
-        description: "Check your email for the password reset link.",
-      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const validatePasswords = (password: string, confirmPassword: string) => {
