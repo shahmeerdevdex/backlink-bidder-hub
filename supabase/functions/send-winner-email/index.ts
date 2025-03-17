@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { SMTPClient } from 'npm:emailjs@4.0.3'
 
@@ -12,8 +11,8 @@ const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
   password: 'cjiaXnh5piNh!nj',
   host: 'mail.privateemail.com',
-  port: 465, // Using SSL port
-  ssl: true,
+  port: 587, // Using TLS port
+  tls: true, // Enable TLS
 })
 
 // CORS headers

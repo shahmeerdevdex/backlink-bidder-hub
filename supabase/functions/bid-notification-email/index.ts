@@ -11,8 +11,8 @@ const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
   password: 'cjiaXnh5piNh!nj',
   host: 'mail.privateemail.com',
-  port: 465, // Using SSL port
-  ssl: true,
+  port: 587, // Using TLS port
+  tls: true, // Enable TLS instead of SSL
 })
 
 // CORS headers
