@@ -1,6 +1,6 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { stripe } from '../_shared/stripe.ts'
+import Stripe from "https://esm.sh/stripe@17.7.0?target=deno";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? ''
@@ -9,12 +9,16 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY"), {
+  httpClient: Stripe.createFetchHttpClient(),
+  apiVersion: "2023-10-16",
+});
 
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
-
+const cryptoProvider = Stripe.createSubtleCryptoProvider()
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -22,7 +26,7 @@ serve(async (req) => {
   }
 
   try {
-    const signature = req.headers.get('stripe-signature')
+    const signature = req.headers.get('Stripe-Signature')
     if (!signature) {
       throw new Error('No Stripe signature found')
     }
@@ -30,18 +34,24 @@ serve(async (req) => {
     const body = await req.text()
     let event
 
+    // try {
+    //   event = stripe.webhooks.constructEvent(
+    //     body,
+    //     signature,
+    //     STRIPE_WEBHOOK_SECRET
+    //   )
+    // } catch (err) {
+    //   console.error(`⚠️ Webhook signature verification failed.`, err.message)
+    //   return new Response(JSON.stringify({ error: err.message }), { 
+    //     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    //     status: 400 
+    //   })
+    // }
+
     try {
-      event = stripe.webhooks.constructEvent(
-        body,
-        signature,
-        STRIPE_WEBHOOK_SECRET
-      )
+      event = await stripe.webhooks.constructEventAsync(body, signature, STRIPE_WEBHOOK_SECRET,undefined,cryptoProvider);
     } catch (err) {
-      console.error(`⚠️ Webhook signature verification failed.`, err.message)
-      return new Response(JSON.stringify({ error: err.message }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400 
-      })
+      return new Response(`Webhook error: ${err.message}`, { status: 400 });
     }
 
     console.log(`✅ Received Stripe event: ${event.type}`)
@@ -78,7 +88,7 @@ serve(async (req) => {
           const { data: bidData, error: bidError } = await supabaseClient
             .from('bids')
             .update({
-              status: 'paid',
+              status: 'won',
               updated_at: new Date().toISOString()
             })
             .eq('id', bidId)
@@ -96,7 +106,6 @@ serve(async (req) => {
               .from('auction_winners')
               .update({
                 status: 'paid',
-                updated_at: new Date().toISOString()
               })
               .eq('winning_bid_id', bidId)
               .eq('user_id', bidData[0].user_id)
