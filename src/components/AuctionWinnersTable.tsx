@@ -82,9 +82,8 @@ export default function AuctionWinnersTable() {
         id, 
         status, 
         payment_deadline,
-        user_id (id, email),
-        auction_id (id, title),
-        winning_bid_id (id, amount)
+        auction_id(id, title),
+        winning_bid_id(id, amount)
       `);
 
     if (selectedAuctionId !== 'all') {
@@ -93,39 +92,51 @@ export default function AuctionWinnersTable() {
 
     query = query.order('payment_deadline', { ascending: false });
     
-    const { data, error } = await query;
+    const { data: winnersData, error: winnersError } = await query;
 
-    if (error) {
+    if (winnersError) {
       toast({
         title: "Error fetching winners",
-        description: error.message,
+        description: winnersError.message,
         variant: "destructive",
       });
       setLoading(false);
       return;
     }
 
-    // Transform the data structure to match our interface
-    const formattedWinners = data?.map(record => {
+    // Fetch user data for each winner
+    const winnerPromises = winnersData?.map(async (winner) => {
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('id', winner.user_id)
+        .single();
+
+      if (userError) {
+        console.error("Error fetching user data:", userError);
+        return null;
+      }
+
       return {
-        id: record.id,
+        id: winner.id,
         user: {
-          id: record.user_id?.id || '',
-          email: record.user_id?.email || ''
+          id: userData?.id || '',
+          email: userData?.email || ''
         },
         auction: {
-          id: record.auction_id?.id || '',
-          title: record.auction_id?.title || ''
+          id: winner.auction_id?.id || '',
+          title: winner.auction_id?.title || ''
         },
-        status: record.status || '',
-        payment_deadline: record.payment_deadline,
+        status: winner.status || '',
+        payment_deadline: winner.payment_deadline,
         winning_bid: {
-          id: record.winning_bid_id?.id || '',
-          amount: record.winning_bid_id?.amount || 0
+          id: winner.winning_bid_id?.id || '',
+          amount: winner.winning_bid_id?.amount || 0
         }
       };
     }) || [];
 
+    const formattedWinners = (await Promise.all(winnerPromises)).filter(Boolean) as Winner[];
     setWinners(formattedWinners);
     setLoading(false);
   };
