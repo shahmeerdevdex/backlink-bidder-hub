@@ -23,6 +23,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import AuctionWinnersTable from '@/components/AuctionWinnersTable';
 
 interface User {
   id: string;
@@ -211,98 +218,118 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>User Management</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Created At</TableHead>
-                <TableHead>Admin Status</TableHead>
-                <TableHead>Ban Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    {user.is_admin ? (
-                      <span className="flex items-center text-green-600">
-                        <CheckCircle className="w-4 h-4 mr-1" /> Admin
-                      </span>
-                    ) : (
-                      <span className="flex items-center text-gray-600">
-                        <UserCog className="w-4 h-4 mr-1" /> User
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {user.is_banned ? (
-                      <span className="flex items-center text-red-600">
-                        <Ban className="w-4 h-4 mr-1" /> Banned
-                      </span>
-                    ) : (
-                      <span className="flex items-center text-green-600">
-                        <UserCheck className="w-4 h-4 mr-1" /> Active
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="space-x-2">
-                    <Button
-                      variant={user.is_admin ? "destructive" : "default"}
-                      size="sm"
-                      onClick={() => toggleAdminStatus(user.id, user.is_admin)}
-                      className="mb-2 md:mb-0"
-                    >
-                      {user.is_admin ? (
-                        <>
-                          <Ban className="w-4 h-4 mr-1" />
-                          Revoke Admin
-                        </>
-                      ) : (
-                        <>
-                          <UserCog className="w-4 h-4 mr-1" />
-                          Make Admin
-                        </>
-                      )}
-                    </Button>
-                    
-                    {user.is_banned ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUnbanUser(user.id)}
-                        className="whitespace-nowrap"
-                      >
-                        <UserCheck className="w-4 h-4 mr-1" />
-                        Unban User
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleBanUser(user.id)}
-                        className="whitespace-nowrap"
-                      >
-                        <Ban className="w-4 h-4 mr-1" />
-                        Ban User
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="users" className="w-full mb-10">
+        <TabsList className="mb-6">
+          <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="winners">Auction Winners</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Created At</TableHead>
+                    <TableHead>Admin Status</TableHead>
+                    <TableHead>Ban Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {user.is_admin ? (
+                          <span className="flex items-center text-green-600">
+                            <CheckCircle className="w-4 h-4 mr-1" /> Admin
+                          </span>
+                        ) : (
+                          <span className="flex items-center text-gray-600">
+                            <UserCog className="w-4 h-4 mr-1" /> User
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.is_banned ? (
+                          <span className="flex items-center text-red-600">
+                            <Ban className="w-4 h-4 mr-1" /> Banned
+                          </span>
+                        ) : (
+                          <span className="flex items-center text-green-600">
+                            <UserCheck className="w-4 h-4 mr-1" /> Active
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="space-x-2">
+                        <Button
+                          variant={user.is_admin ? "destructive" : "default"}
+                          size="sm"
+                          onClick={() => toggleAdminStatus(user.id, user.is_admin)}
+                          className="mb-2 md:mb-0"
+                        >
+                          {user.is_admin ? (
+                            <>
+                              <Ban className="w-4 h-4 mr-1" />
+                              Revoke Admin
+                            </>
+                          ) : (
+                            <>
+                              <UserCog className="w-4 h-4 mr-1" />
+                              Make Admin
+                            </>
+                          )}
+                        </Button>
+                        
+                        {user.is_banned ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnbanUser(user.id)}
+                            className="whitespace-nowrap"
+                          >
+                            <UserCheck className="w-4 h-4 mr-1" />
+                            Unban User
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleBanUser(user.id)}
+                            className="whitespace-nowrap"
+                          >
+                            <Ban className="w-4 h-4 mr-1" />
+                            Ban User
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="winners">
+          <Card>
+            <CardHeader>
+              <CardTitle>Auction Winners</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AuctionWinnersTable />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={banDialogOpen} onOpenChange={setBanDialogOpen}>
         <DialogContent>
