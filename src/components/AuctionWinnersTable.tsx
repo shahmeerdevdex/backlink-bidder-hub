@@ -13,6 +13,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, AlertTriangle, Ban } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface Winner {
   id: string;
@@ -32,29 +34,66 @@ interface Winner {
   };
 }
 
+interface Auction {
+  id: string;
+  title: string;
+}
+
 export default function AuctionWinnersTable() {
   const [winners, setWinners] = useState<Winner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [selectedAuctionId, setSelectedAuctionId] = useState<string>('all');
   const { toast } = useToast();
 
   useEffect(() => {
+    fetchAuctions();
     fetchWinners();
   }, []);
+
+  useEffect(() => {
+    fetchWinners();
+  }, [selectedAuctionId]);
+
+  const fetchAuctions = async () => {
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('id, title')
+      .order('title');
+
+    if (error) {
+      toast({
+        title: "Error fetching auctions",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAuctions(data || []);
+  };
 
   const fetchWinners = async () => {
     setLoading(true);
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('auction_winners')
       .select(`
         id, 
         status, 
         payment_deadline,
-        user_id (id, email:profiles!inner(email)),
-        auction_id (id, title:auctions!inner(title)),
-        winning_bid_id (id, amount:bids!inner(amount))
-      `)
-      .order('payment_deadline', { ascending: false });
+        user_id (id, email),
+        auction_id (id, title),
+        winning_bid_id (id, amount)
+      `);
+
+    if (selectedAuctionId !== 'all') {
+      query = query.eq('auction_id', selectedAuctionId);
+    }
+
+    query = query.order('payment_deadline', { ascending: false });
+    
+    const { data, error } = await query;
 
     if (error) {
       toast({
@@ -67,23 +106,25 @@ export default function AuctionWinnersTable() {
     }
 
     // Transform the data structure to match our interface
-    const formattedWinners = data?.map(record => ({
-      id: record.id,
-      user: {
-        id: record.user_id.id, // Fixed: Access id property on user_id object
-        email: record.user_id.email // Fixed: Access email property on user_id object
-      },
-      auction: {
-        id: record.auction_id.id,
-        title: record.auction_id.title
-      },
-      status: record.status || '',
-      payment_deadline: record.payment_deadline,
-      winning_bid: {
-        id: record.winning_bid_id.id,
-        amount: record.winning_bid_id.amount
-      }
-    })) || [];
+    const formattedWinners = data?.map(record => {
+      return {
+        id: record.id,
+        user: {
+          id: record.user_id?.id || '',
+          email: record.user_id?.email || ''
+        },
+        auction: {
+          id: record.auction_id?.id || '',
+          title: record.auction_id?.title || ''
+        },
+        status: record.status || '',
+        payment_deadline: record.payment_deadline,
+        winning_bid: {
+          id: record.winning_bid_id?.id || '',
+          amount: record.winning_bid_id?.amount || 0
+        }
+      };
+    }) || [];
 
     setWinners(formattedWinners);
     setLoading(false);
@@ -128,7 +169,7 @@ export default function AuctionWinnersTable() {
     }
   };
 
-  if (loading) {
+  if (loading && selectedAuctionId === 'all') {
     return (
       <div className="flex justify-center items-center p-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -138,17 +179,45 @@ export default function AuctionWinnersTable() {
 
   return (
     <div className="w-full">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <h2 className="text-xl font-semibold">Auction Winners</h2>
-        <Button onClick={fetchWinners} variant="outline" size="sm">
-          Refresh
-        </Button>
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+          <div className="w-full md:w-72">
+            <Select
+              value={selectedAuctionId}
+              onValueChange={setSelectedAuctionId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select an auction" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Auctions</SelectItem>
+                {auctions.map((auction) => (
+                  <SelectItem key={auction.id} value={auction.id}>
+                    {auction.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={fetchWinners} variant="outline" size="sm">
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      {winners.length === 0 ? (
-        <div className="text-center p-8 text-muted-foreground">
-          No auction winners found.
+      {loading && selectedAuctionId !== 'all' ? (
+        <div className="flex justify-center items-center p-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : winners.length === 0 ? (
+        <Card>
+          <CardContent className="text-center p-8 text-muted-foreground">
+            {selectedAuctionId === 'all' ? 
+              "No auction winners found." : 
+              "No winners found for this auction."}
+          </CardContent>
+        </Card>
       ) : (
         <div className="rounded-md border">
           <Table>
