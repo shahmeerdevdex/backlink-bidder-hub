@@ -115,7 +115,6 @@ Deno.serve(async (req) => {
       // Check if this is the first bid in the auction (created by auction creator)
       if (bid.user_id === auction.creator_id && !notifyAllUsers) {
         console.log('This is a bid by the auction creator, setting notifyAllUsers to true')
-        notifyAllUsers = true;
       }
     } else if (auctionId) {
       // If we have an auction ID, get auction details directly
