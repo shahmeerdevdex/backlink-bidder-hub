@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { SMTPClient } from 'npm:emailjs@4.0.3'
 
@@ -11,7 +12,7 @@ const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
   password: 'cjiaXnh5piNh!nj',
   host: 'mail.privateemail.com',
-  port: 587, // Using TLS port
+  port: 456, // Changed to port 456
   tls: true, // Enable TLS
 })
 
