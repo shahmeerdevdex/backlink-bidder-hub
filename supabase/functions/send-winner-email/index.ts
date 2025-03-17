@@ -7,13 +7,17 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Initialize SMTP client for Private Email
+// Initialize SMTP client with updated connection settings
 const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
   password: 'cjiaXnh5piNh!nj',
   host: 'mail.privateemail.com',
-  port: 587, // Changed back to port 587
-  tls: true, // Enable TLS
+  port: 587,
+  tls: {
+    ciphers: 'SSLv3',
+    rejectUnauthorized: false
+  },
+  timeout: 60000  // Increase timeout to 60 seconds
 })
 
 // CORS headers
