@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       handleAuthChange(event, session?.user);
 
       // Don't update user state during PASSWORD_RECOVERY to prevent sign-out
-      if (event === 'PASSWORD_RECOVERY') {
+      if (event === 'PASSWORD_RECOVERY' as AuthChangeEvent) {
         console.log("Password recovery event detected");
         // Don't change the user state
       } else {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsEmailVerified(!!session.user.email_confirmed_at);
           checkAdminStatus(session.user.id);
           checkBanStatus(session.user.id);
-        } else if (event !== 'PASSWORD_RECOVERY') {
+        } else if (event !== 'PASSWORD_RECOVERY' as AuthChangeEvent) {
           // Only reset these states if not in password recovery
           setIsAdmin(false);
           setIsEmailVerified(false);

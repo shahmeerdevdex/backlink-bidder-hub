@@ -29,6 +29,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { useNavigate } from "react-router-dom";
 
 interface AuctionCardProps {
   auction: Auction;
@@ -42,6 +43,7 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
   const [isBidding, setIsBidding] = useState(false);
   const [highestBid, setHighestBid] = useState<number>(auction.current_price);
   const [timeRemaining, setTimeRemaining] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -136,6 +138,10 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
     }
   };
 
+  const handleViewAuction = () => {
+    navigate(`/auctions/${auction.id}`);
+  };
+
   return (
     <Card className={cn("bg-secondary", className)}>
       <CardHeader>
@@ -196,7 +202,7 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <Button>View Auction</Button>
+        <Button onClick={handleViewAuction}>View Auction</Button>
       </CardFooter>
     </Card>
   );
