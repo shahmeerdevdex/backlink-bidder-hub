@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Pencil, Trash2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { format } from 'date-fns';
@@ -118,12 +118,12 @@ export default function AuctionManagement() {
         try {
           console.log('New auction created. Sending notification emails for auction ID:', auctionId);
           
-          // Invoke the edge function with the correct parameters
+          // Invoke the edge function with the correct parameters - explicitly set notifyAllUsers to true
           const { data: notificationData, error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
-            body: { 
+            body: JSON.stringify({ 
               auctionId: auctionId,
-              notifyAllUsers: true  // Make sure this parameter is set to true for new auctions
-            }
+              notifyAllUsers: true  // Explicitly set to true for new auctions
+            })
           });
 
           if (notificationError) {

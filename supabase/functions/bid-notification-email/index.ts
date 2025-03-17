@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { SMTPClient } from 'npm:emailjs@4.0.3'
 
@@ -154,11 +153,9 @@ Deno.serve(async (req) => {
       console.log(`Creator email: ${bidderEmail}`)
       
       // For direct auction notification, always notify all users if notifyAllUsers is true
-      // notifyAllUsers = true explicitly set here for clarity, though it may already be true
-      if (notifyAllUsers !== true) {
-        console.log("notifyAllUsers parameter is false or not set, but we received an auctionId directly. Setting to true.");
-        notifyAllUsers = true;
-      }
+      // Explicitly force notifyAllUsers to true for new auctions
+      console.log("Processing auction ID directly, ensuring notifyAllUsers is true");
+      notifyAllUsers = true;
     }
 
     // Handle outbid notification specifically if outbidUserId is provided

@@ -21,7 +21,12 @@ export const supabase = createClient<Database>(
 
 // Add debug logging for function invocation
 const originalInvoke = supabase.functions.invoke;
-supabase.functions.invoke = async function(functionName, options) {
+supabase.functions.invoke = async function(functionName, options = {}) {
+  // Ensure options.body is properly stringified if it's an object
+  if (options.body && typeof options.body === 'object') {
+    options.body = JSON.stringify(options.body);
+  }
+  
   console.log(`Invoking Supabase function: ${functionName}`, options);
   try {
     const result = await originalInvoke.call(this, functionName, options);
