@@ -464,7 +464,7 @@ export default function AuctionDetail() {
   }
 
   const isUserEligibleToPay = userWinner && 
-    (userWinner.status === 'pending_payment' || 
+    (userWinner.status === 'pending_payment' &&
      (isAuctionEnded && topBidders.has(currentUser || '')));
   
   const userHighestBid = currentUser ? 

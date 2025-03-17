@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
       
       try {
         const emailResult = await smtpClient.sendAsync({
-          from: 'sabina@elegantmentions.com',
+          from: 'EM Auction System <sabina@elegantmentions.com>',
           to: outbidUserEmail,
           subject: `You've been outbid on auction: ${auction.title}`,
           text: `You've been outbid on the auction: ${auction.title}.
@@ -403,7 +403,7 @@ Deno.serve(async (req) => {
       try {
         console.log(`Sending special email to creator: ${bidderEmail}`)
         const creatorEmailResult = await smtpClient.sendAsync({
-          from: 'Auction System <sabina@elegantmentions.com>',
+          from: 'EM Auction System <sabina@elegantmentions.com>',
           to: bidderEmail,
           subject: `Your auction "${auction.title}" has been created`,
           text: `Your auction "${auction.title}" has been successfully created.
