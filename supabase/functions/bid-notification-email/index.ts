@@ -12,7 +12,11 @@ const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
   password: 'cjiaXnh5piNh!nj',
   host: 'mail.privateemail.com',
-  port: 465,
+  port: 587,
+  tls: {
+    ciphers: 'SSLv3',
+    rejectUnauthorized: false  // Don't validate the certificate
+  },
   timeout: 60000  // Increase timeout to 60 seconds
 })
 
@@ -237,7 +241,7 @@ Deno.serve(async (req) => {
       
       try {
         const emailResult = await smtpClient.sendAsync({
-          from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+          from: 'Auction System <sabina@elegantmentions.com>',
           to: outbidUserEmail,
           subject: `You've been outbid on auction: ${auction.title}`,
           text: `You've been outbid on the auction: ${auction.title}.
@@ -403,7 +407,7 @@ Deno.serve(async (req) => {
       try {
         console.log(`Sending special email to creator: ${bidderEmail}`)
         const creatorEmailResult = await smtpClient.sendAsync({
-          from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+          from: 'Auction System <sabina@elegantmentions.com>',
           to: bidderEmail,
           subject: `Your auction "${auction.title}" has been created`,
           text: `Your auction "${auction.title}" has been successfully created.
@@ -520,7 +524,7 @@ Deno.serve(async (req) => {
 
       // Prepare email content
       const emailPromise = smtpClient.sendAsync({
-        from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+        from: 'Auction System <sabina@elegantmentions.com>',
         to: userEmail,
         subject: `New bid placed on auction: ${auction.title}`,
         text: `A new bid has been placed on the auction: ${auction.title}.
