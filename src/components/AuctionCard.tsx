@@ -27,7 +27,7 @@ import { Auction, Bid } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogIn } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useNavigate } from "react-router-dom";
 
@@ -142,6 +142,34 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
     navigate(`/auctions/${auction.id}`);
   };
 
+  const handleNavigateToAuth = () => {
+    navigate('/auth');
+  };
+
+  // For unauthenticated users, show limited information
+  if (!user) {
+    return (
+      <Card className={cn("bg-secondary", className)}>
+        <CardHeader>
+          <CardTitle>{auction.title}</CardTitle>
+          <CardDescription>
+            {auction.description} - Ends in {timeRemaining}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Sign in to see more details and place bids.</p>
+        </CardContent>
+        <CardFooter>
+          <Button variant="outline" onClick={handleNavigateToAuth}>
+            <LogIn className="mr-2 h-4 w-4" />
+            Sign In to View
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  // For authenticated users, show full card with bidding functionality
   return (
     <Card className={cn("bg-secondary", className)}>
       <CardHeader>
