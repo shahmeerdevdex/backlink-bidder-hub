@@ -12,7 +12,7 @@ const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
   password: 'cjiaXnh5piNh!nj',
   host: 'mail.privateemail.com',
-  port: 456, // Changed to port 456
+  port: 587, // Changed back to port 587
   tls: true, // Enable TLS
 })
 
