@@ -82,6 +82,7 @@ export default function AuctionWinnersTable() {
         id, 
         status, 
         payment_deadline,
+        user_id,
         auction_id(id, title),
         winning_bid_id(id, amount)
       `);
