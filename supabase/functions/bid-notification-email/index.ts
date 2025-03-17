@@ -358,7 +358,7 @@ Deno.serve(async (req) => {
           attachment: [
             {
               data: `
-                <h1>New Auction Alert!</h1>
+                <p>New Auction Alert!</p>
                 <p>A new auction has been created: <strong>${auction.title}</strong></p>
                 <p>Auction details:</p>
                 <ul>
