@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -76,53 +75,47 @@ export default function AuctionWinnersTable() {
   const fetchWinners = async () => {
     setLoading(true);
     
-    let query = supabase
-      .from('auction_winners')
-      .select(`
-        id, 
-        status, 
-        payment_deadline,
-        user_id,
-        auction_id(id, title),
-        winning_bid_id(id, amount)
-      `);
-
-    if (selectedAuctionId !== 'all') {
-      query = query.eq('auction_id', selectedAuctionId);
-    }
-
-    query = query.order('payment_deadline', { ascending: false });
-    
-    const { data: winnersData, error: winnersError } = await query;
-
-    if (winnersError) {
-      toast({
-        title: "Error fetching winners",
-        description: winnersError.message,
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Fetch user data for each winner
-    const winnerPromises = winnersData?.map(async (winner) => {
-      const { data: userData, error: userError } = await supabase
+    try {
+      // First, fetch all user profiles into a map for quick lookup
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email')
-        .eq('id', winner.user_id)
-        .single();
+        .select('id, email');
+      
+      if (profilesError) throw profilesError;
+      
+      // Create a map of user IDs to their email addresses for quick access
+      const userMap = new Map();
+      profilesData?.forEach(profile => {
+        userMap.set(profile.id, profile.email);
+      });
+      
+      // Now fetch the winners with a single query
+      let query = supabase
+        .from('auction_winners')
+        .select(`
+          id, 
+          status, 
+          payment_deadline,
+          user_id,
+          auction_id(id, title),
+          winning_bid_id(id, amount)
+        `);
 
-      if (userError) {
-        console.error("Error fetching user data:", userError);
-        return null;
+      if (selectedAuctionId !== 'all') {
+        query = query.eq('auction_id', selectedAuctionId);
       }
 
-      return {
+      query = query.order('payment_deadline', { ascending: false });
+      
+      const { data: winnersData, error: winnersError } = await query;
+      if (winnersError) throw winnersError;
+
+      // Transform the data to match the Winner interface
+      const formattedWinners = winnersData?.map(winner => ({
         id: winner.id,
         user: {
-          id: userData?.id || '',
-          email: userData?.email || ''
+          id: winner.user_id,
+          email: userMap.get(winner.user_id) || 'Unknown user'
         },
         auction: {
           id: winner.auction_id?.id || '',
@@ -134,12 +127,19 @@ export default function AuctionWinnersTable() {
           id: winner.winning_bid_id?.id || '',
           amount: winner.winning_bid_id?.amount || 0
         }
-      };
-    }) || [];
+      })) || [];
 
-    const formattedWinners = (await Promise.all(winnerPromises)).filter(Boolean) as Winner[];
-    setWinners(formattedWinners);
-    setLoading(false);
+      setWinners(formattedWinners);
+    } catch (error) {
+      toast({
+        title: "Error fetching data",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      });
+      console.error("Error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateWinnerStatus = async (winnerId: string, newStatus: string) => {
