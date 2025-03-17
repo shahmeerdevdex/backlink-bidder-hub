@@ -338,7 +338,7 @@ Deno.serve(async (req) => {
         console.log(`Preparing to send email to: ${profile.email} about new auction`)
         
         const emailPromise = smtpClient.sendAsync({
-          from: 'Auction System <sabina@elegantmentions.com>',
+          from: 'EM Auction System <sabina@elegantmentions.com>',
           to: profile.email,
           subject: `New Auction Created: ${auction.title}`,
           text: `A new auction has been created: ${auction.title}. 
@@ -350,7 +350,7 @@ Deno.serve(async (req) => {
           attachment: [
             {
               data: `
-                <h1>New Auction Alert!</h1>
+                <p>New Auction Alert!</p>
                 <p>A new auction has been created: <strong>${auction.title}</strong></p>
                 <p>Auction details:</p>
                 <ul>
