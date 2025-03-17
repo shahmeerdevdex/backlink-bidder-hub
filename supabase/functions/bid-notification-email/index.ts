@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { SMTPClient } from 'npm:emailjs@4.0.3'
 
@@ -12,6 +13,7 @@ const smtpClient = new SMTPClient({
   password: 'cjiaXnh5piNh!nj',
   host: 'mail.privateemail.com',
   port: 465,
+  ssl: true,  // Enable SSL explicitly
   timeout: 60000  // Increase timeout to 60 seconds
 })
 
