@@ -12,11 +12,8 @@ const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
   password: 'cjiaXnh5piNh!nj',
   host: 'mail.privateemail.com',
-  port: 587,
-  tls: {
-    ciphers: 'SSLv3',
-    rejectUnauthorized: false
-  },
+  port: 465,
+  ssl: true,
   timeout: 60000  // Increase timeout to 60 seconds
 })
 
@@ -124,7 +121,7 @@ Deno.serve(async (req) => {
 
       // Prepare email content
       const emailPromise = smtpClient.sendAsync({
-        from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
+        from: 'sabina@elegantmentions.com',
         to: userEmail,
         subject: `Congratulations! You've won the auction: ${auction.title}`,
         text: `Congratulations! You are one of the winning bidders for the auction: ${auction.title}. Your winning bid amount: $${bid.amount}. Please log in to your account to complete the payment process within 24 hours. Thank you for participating!`,
