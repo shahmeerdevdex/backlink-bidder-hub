@@ -7,6 +7,9 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
+// Base URL for auction links
+const baseUrl = 'https://auction.elegantmentions.com'
+
 // Initialize SMTP client with updated connection settings
 const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
@@ -68,6 +71,9 @@ Deno.serve(async (req) => {
 
     console.log(`Auction data retrieved:`, auction)
     
+    // Create auction page URL
+    const auctionPageUrl = `${baseUrl}/auctions/${auction.id}`;
+    
     // Find winners (top bidders based on max_spots)
     console.log(`Fetching top bidders for auction with max_spots: ${auction.max_spots}`)
     const { data: topBids, error: bidsError } = await supabase
@@ -124,7 +130,7 @@ Deno.serve(async (req) => {
         from: 'sabina@elegantmentions.com',
         to: userEmail,
         subject: `Congratulations! You've won the auction: ${auction.title}`,
-        text: `Congratulations! You are one of the winning bidders for the auction: ${auction.title}. Your winning bid amount: $${bid.amount}. Please log in to your account to complete the payment process within 24 hours. Thank you for participating!`,
+        text: `Congratulations! You are one of the winning bidders for the auction: ${auction.title}. Your winning bid amount: $${bid.amount}. Please log in to your account to complete the payment process within 24 hours. You can view the auction and complete payment here: ${auctionPageUrl} Thank you for participating!`,
         attachment: [
           {
             data: `
@@ -132,6 +138,7 @@ Deno.serve(async (req) => {
               <p>You are one of the winning bidders for the auction: <strong>${auction.title}</strong></p>
               <p>Your winning bid amount: <strong>$${bid.amount}</strong></p>
               <p>Please log in to your account to complete the payment process within 24 hours.</p>
+              <p><a href="${auctionPageUrl}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">Complete Payment</a></p>
               <p>Thank you for participating!</p>
             `,
             alternative: true

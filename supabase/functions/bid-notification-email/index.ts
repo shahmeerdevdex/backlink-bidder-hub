@@ -7,6 +7,9 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
+// Base URL for auction links
+const baseUrl = 'https://auction.elegantmentions.com'
+
 // Initialize SMTP client with updated connection settings
 const smtpClient = new SMTPClient({
   user: 'sabina@elegantmentions.com',
@@ -159,6 +162,9 @@ Deno.serve(async (req) => {
       notifyAllUsers = true;
     }
 
+    // Create auction page URL
+    const auctionPageUrl = `${baseUrl}/auctions/${auction.id}`;
+
     // Handle outbid notification specifically if outbidUserId is provided
     if (outbidUserId) {
       console.log(`Processing outbid notification for user: ${outbidUserId}`)
@@ -246,7 +252,7 @@ Deno.serve(async (req) => {
               ? `You're still in a winning position! Your highest bid of $${userHighestBid?.amount || 0} still secures you a spot in the top ${auction.max_spots} bidders.` 
               : `You're no longer in a winning position. Your highest bid of $${userHighestBid?.amount || 0} is below the current minimum winning bid of $${minWinningBid}.`}
             ${!isStillInWinningPosition ? `You need to place a new bid of at least $${minWinningBid + 1} to secure a spot again.` : ''}
-            Please check the auction for more details.`,
+            Please check the auction for more details at: ${auctionPageUrl}`,
           attachment: [
             {
               data: `
@@ -263,7 +269,7 @@ Deno.serve(async (req) => {
                       <h3 style="color: #c5221f; margin-top: 0;">You're No Longer in a Winning Position</h3>
                       <p>Your highest bid of <strong>$${userHighestBid?.amount || 0}</strong> is below the current minimum winning bid of <strong>$${minWinningBid}</strong>.</p>
                       <p>You need to place a new bid of at least <strong>$${minWinningBid + 1}</strong> to secure a spot again.</p>
-                      <p><a href="${Deno.env.get('PUBLIC_URL') || ''}/auction/${auction.id}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">Place New Bid</a></p>
+                      <p><a href="${auctionPageUrl}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">Place New Bid</a></p>
                     </div>`}
                 <p>Auction details:</p>
                 <ul>
@@ -272,6 +278,7 @@ Deno.serve(async (req) => {
                   <li>Current highest bid: $${newBidAmount}</li>
                   <li>Your highest bid: $${userHighestBid?.amount || 0}</li>
                 </ul>
+                <p><a href="${auctionPageUrl}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">View Auction</a></p>
                 <p>Thank you for participating!</p>
               `,
               alternative: true
@@ -346,11 +353,12 @@ Deno.serve(async (req) => {
             Starting price: $${auction.starting_price}. 
             Maximum spots: ${auction.max_spots}. 
             End date: ${new Date(auction.ends_at).toLocaleString()}.
-            Don't miss your chance to bid on this exciting auction!`,
+            Don't miss your chance to bid on this exciting auction!
+            View the auction here: ${auctionPageUrl}`,
           attachment: [
             {
               data: `
-                <p>New Auction Alert!</p>
+                <h1>New Auction Alert!</h1>
                 <p>A new auction has been created: <strong>${auction.title}</strong></p>
                 <p>Auction details:</p>
                 <ul>
@@ -359,6 +367,7 @@ Deno.serve(async (req) => {
                   <li>Maximum spots: ${auction.max_spots}</li>
                   <li>End date: ${new Date(auction.ends_at).toLocaleString()}</li>
                 </ul>
+                <p><a href="${auctionPageUrl}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">View Auction</a></p>
                 <p>Don't miss your chance to bid on this exciting auction!</p>
                 <p>Thank you for using our auction system!</p>
               `,
@@ -411,6 +420,7 @@ Deno.serve(async (req) => {
             Starting price: $${auction.starting_price}.
             Maximum spots: ${auction.max_spots}.
             You will receive notifications when users place bids on your auction.
+            View your auction here: ${auctionPageUrl}
             Thank you for using our auction system!`,
           attachment: [
             {
@@ -423,6 +433,7 @@ Deno.serve(async (req) => {
                   <li>Starting price: $${auction.starting_price}</li>
                   <li>Maximum spots: ${auction.max_spots}</li>
                 </ul>
+                <p><a href="${auctionPageUrl}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">View Your Auction</a></p>
                 <p>You will receive notifications when users place bids on your auction.</p>
                 <p>Thank you for using our auction system!</p>
               `,
@@ -528,7 +539,8 @@ Deno.serve(async (req) => {
           Auction description: ${auction.description}.
           Starting price: $${auction.starting_price}.
           Current highest bid: $${auction.current_price}.
-          Your position may have changed. Please log in to check your status.`,
+          Your position may have changed. Please log in to check your status.
+          View the auction here: ${auctionPageUrl}`,
         attachment: [
           {
             data: `
@@ -542,6 +554,7 @@ Deno.serve(async (req) => {
                 <li>Current highest bid: $${auction.current_price}</li>
               </ul>
               <p>Your position may have changed. Please log in to check your status.</p>
+              <p><a href="${auctionPageUrl}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">View Auction</a></p>
               <p>Thank you for participating!</p>
             `,
             alternative: true
