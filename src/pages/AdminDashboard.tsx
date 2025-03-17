@@ -1,10 +1,9 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { UserCog, Ban, CheckCircle, UserCheck } from 'lucide-react';
+import { UserCog, Ban, CheckCircle, UserCheck, BarChart } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -45,11 +44,17 @@ interface AuctionStats {
   total: number;
   active: number;
   completed: number;
+  revenue: number;
 }
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState<AuctionStats>({ total: 0, active: 0, completed: 0 });
+  const [stats, setStats] = useState<AuctionStats>({ 
+    total: 0, 
+    active: 0, 
+    completed: 0, 
+    revenue: 0 
+  });
   const [banReason, setBanReason] = useState('');
   const [banDialogOpen, setBanDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -93,11 +98,26 @@ export default function AdminDashboard() {
       return;
     }
 
+    const { data: payments, error: paymentsError } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('status', 'paid');
+
+    if (paymentsError) {
+      toast({
+        title: "Error fetching payment statistics",
+        description: paymentsError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const total = allAuctions?.length || 0;
     const active = allAuctions?.filter(a => new Date(a.ends_at) > new Date()).length || 0;
     const completed = total - active;
+    const revenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
 
-    setStats({ total, active, completed });
+    setStats({ total, active, completed, revenue });
   };
 
   const toggleAdminStatus = async (userId: string, currentStatus: boolean) => {
@@ -191,7 +211,7 @@ export default function AdminDashboard() {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Total Auctions</CardTitle>
@@ -214,6 +234,17 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-blue-600">{stats.completed}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center">
+              <BarChart className="w-5 h-5 mr-2" />
+              Total Revenue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-purple-600">${stats.revenue}</p>
           </CardContent>
         </Card>
       </div>
@@ -364,3 +395,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

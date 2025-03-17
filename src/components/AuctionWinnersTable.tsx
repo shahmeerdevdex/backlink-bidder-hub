@@ -70,18 +70,18 @@ export default function AuctionWinnersTable() {
     const formattedWinners = data?.map(record => ({
       id: record.id,
       user: {
-        id: record.user_id[0].id,
-        email: record.user_id[0].email
+        id: record.user_id.id, // Fixed: Access id property on user_id object
+        email: record.user_id.email // Fixed: Access email property on user_id object
       },
       auction: {
-        id: record.auction_id[0].id,
-        title: record.auction_id[0].title
+        id: record.auction_id.id,
+        title: record.auction_id.title
       },
       status: record.status || '',
       payment_deadline: record.payment_deadline,
       winning_bid: {
-        id: record.winning_bid_id[0].id,
-        amount: record.winning_bid_id[0].amount
+        id: record.winning_bid_id.id,
+        amount: record.winning_bid_id.amount
       }
     })) || [];
 
