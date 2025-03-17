@@ -153,8 +153,12 @@ Deno.serve(async (req) => {
       bidder = auction.creator_id;
       console.log(`Creator email: ${bidderEmail}`)
       
-      // For direct auction notification, always notify all users
-      notifyAllUsers = true;
+      // For direct auction notification, always notify all users if notifyAllUsers is true
+      // notifyAllUsers = true explicitly set here for clarity, though it may already be true
+      if (notifyAllUsers !== true) {
+        console.log("notifyAllUsers parameter is false or not set, but we received an auctionId directly. Setting to true.");
+        notifyAllUsers = true;
+      }
     }
 
     // Handle outbid notification specifically if outbidUserId is provided
@@ -328,9 +332,12 @@ Deno.serve(async (req) => {
       
       // Send email to all users about the new auction
       for (const profile of allProfiles) {
-        if (!profile.email) continue
+        if (!profile.email) {
+          console.log(`Skipping profile ${profile.id} because it has no email`)
+          continue
+        }
         
-        console.log(`Sending email to: ${profile.email} about new auction`)
+        console.log(`Preparing to send email to: ${profile.email} about new auction`)
         
         const emailPromise = smtpClient.sendAsync({
           from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
@@ -396,6 +403,7 @@ Deno.serve(async (req) => {
       
       // Send special email to the auction creator
       try {
+        console.log(`Sending special email to creator: ${bidderEmail}`)
         const creatorEmailResult = await smtpClient.sendAsync({
           from: 'Auction System <shahmeerhussainkhadmi@gmail.com>',
           to: bidderEmail,
@@ -431,6 +439,20 @@ Deno.serve(async (req) => {
       }
       
       // Wait for all emails to be sent
+      if (emailPromises.length === 0) {
+        console.log("No emails to send - all users might be missing email addresses");
+        return new Response(
+          JSON.stringify({
+            message: "No users with email addresses found to notify",
+            successCount: 0
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
       console.log(`Waiting for ${emailPromises.length} emails to be sent`)
       const results = await Promise.all(emailPromises)
       console.log(`Email sending results:`, results)

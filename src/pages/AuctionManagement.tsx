@@ -118,19 +118,35 @@ export default function AuctionManagement() {
         try {
           console.log('New auction created. Sending notification emails for auction ID:', auctionId);
           
+          // Invoke the edge function with the correct parameters
           const { data: notificationData, error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
             body: { 
-              auctionId: auctionId
+              auctionId: auctionId,
+              notifyAllUsers: true  // Make sure this parameter is set to true for new auctions
             }
           });
 
           if (notificationError) {
             console.error('Error sending auction creation notifications:', notificationError);
+            toast({
+              title: "Notification Error",
+              description: "Failed to send email notifications about the new auction.",
+              variant: "destructive",
+            });
           } else {
             console.log('Auction creation notification response:', notificationData);
+            toast({
+              title: "Notifications Sent",
+              description: "Email notifications about the new auction have been sent.",
+            });
           }
         } catch (notificationError) {
           console.error('Failed to invoke bid notification function for new auction:', notificationError);
+          toast({
+            title: "Notification Error",
+            description: "Failed to send email notifications about the new auction.",
+            variant: "destructive",
+          });
         }
       }
 
