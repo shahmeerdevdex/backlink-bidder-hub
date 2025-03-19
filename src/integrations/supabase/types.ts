@@ -84,6 +84,7 @@ export type Database = {
           status: string | null
           title: string
           updated_at: string | null
+          winners_being_processed: boolean | null
           winners_processed: boolean | null
         }
         Insert: {
@@ -100,6 +101,7 @@ export type Database = {
           status?: string | null
           title: string
           updated_at?: string | null
+          winners_being_processed?: boolean | null
           winners_processed?: boolean | null
         }
         Update: {
@@ -116,6 +118,7 @@ export type Database = {
           status?: string | null
           title?: string
           updated_at?: string | null
+          winners_being_processed?: boolean | null
           winners_processed?: boolean | null
         }
         Relationships: []

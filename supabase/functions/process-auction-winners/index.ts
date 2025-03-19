@@ -136,10 +136,17 @@ serve(async (req) => {
           // Process each winner - but do it one by one to prevent race conditions
           const winners = [];
           for (const bid of topBidders) {
+            // Skip if this user is already a winner for this auction
+            if (existingWinnerUserIds.has(bid.user_id)) {
+              console.log(`User ${bid.user_id} is already a winner for auction ${auction.id}, skipping`);
+              continue;
+            }
+
             console.log(`Processing winner user ${bid.user_id} with highest bid ${bid.id} amount ${bid.amount}`);
             
             // Double-check if this user is already a winner for this auction
             // This prevents race conditions between when we checked earlier and now
+            // We're also taking advantage of the unique constraint we just added
             const { data: currentWinner } = await supabaseClient
               .from("auction_winners")
               .select("*")
@@ -148,7 +155,7 @@ serve(async (req) => {
               .maybeSingle();
 
             if (currentWinner) {
-              console.log(`User ${bid.user_id} is already a winner for auction ${auction.id}, skipping`);
+              console.log(`User ${bid.user_id} is already a winner for auction ${auction.id}, skipping insertion`);
               winners.push(currentWinner);
               continue;
             }
@@ -158,6 +165,7 @@ serve(async (req) => {
             deadline.setHours(deadline.getHours() + 24);
 
             // Insert winner record with ON CONFLICT DO NOTHING to prevent duplicates
+            // The unique constraint we added will also help prevent duplicates
             const { data: winner, error: winnerError } = await supabaseClient
               .from("auction_winners")
               .insert({

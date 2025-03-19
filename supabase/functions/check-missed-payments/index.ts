@@ -69,7 +69,7 @@ serve(async (req) => {
           .not("user_id", "in", `(${currentWinnerIds.join(',')})`)
           .order("amount", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (nextError || !nextBidder) {
           // No more eligible bidders
@@ -80,49 +80,77 @@ serve(async (req) => {
           };
         }
 
+        // Double-check that this user isn't already a winner
+        // This could happen in race conditions
+        const { data: existingWinner } = await supabaseClient
+          .from("auction_winners")
+          .select("id")
+          .eq("auction_id", missed.auction_id)
+          .eq("user_id", nextBidder.user_id)
+          .maybeSingle();
+
+        if (existingWinner) {
+          return {
+            auction_id: missed.auction_id,
+            missed_winner_id: missed.user_id,
+            message: `Next bidder ${nextBidder.user_id} is already a winner`
+          };
+        }
+
         // Set 24 hour payment deadline for next bidder
         const deadline = new Date();
         deadline.setHours(deadline.getHours() + 24);
 
         // Create new winner record for next bidder
-        const { data: newWinner, error: newWinnerError } = await supabaseClient
-          .from("auction_winners")
-          .insert({
-            auction_id: missed.auction_id,
-            user_id: nextBidder.user_id,
-            winning_bid_id: nextBidder.id,
-            payment_deadline: deadline.toISOString(),
-            status: "pending_payment"
-          })
-          .select()
-          .single();
-
-        if (newWinnerError) {
-          throw new Error(`Error creating new winner: ${newWinnerError.message}`);
-        }
-
-        // Send email notification to new winner
         try {
-          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-winner-email`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
-            },
-            body: JSON.stringify({
-              winnerId: newWinner.id
+          const { data: newWinner, error: newWinnerError } = await supabaseClient
+            .from("auction_winners")
+            .insert({
+              auction_id: missed.auction_id,
+              user_id: nextBidder.user_id,
+              winning_bid_id: nextBidder.id,
+              payment_deadline: deadline.toISOString(),
+              status: "pending_payment"
             })
-          });
-        } catch (emailError) {
-          console.error(`Error sending new winner email: ${emailError}`);
-        }
+            .select()
+            .single();
 
-        return {
-          auction_id: missed.auction_id,
-          missed_winner_id: missed.user_id,
-          new_winner_id: nextBidder.user_id,
-          new_winner_bid_amount: nextBidder.amount
-        };
+          if (newWinnerError) {
+            throw new Error(`Error creating new winner: ${newWinnerError.message}`);
+          }
+
+          // Send email notification to new winner
+          try {
+            await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-winner-email`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
+              },
+              body: JSON.stringify({
+                winnerId: newWinner.id
+              })
+            });
+          } catch (emailError) {
+            console.error(`Error sending new winner email: ${emailError}`);
+          }
+
+          return {
+            auction_id: missed.auction_id,
+            missed_winner_id: missed.user_id,
+            new_winner_id: nextBidder.user_id,
+            new_winner_bid_amount: nextBidder.amount
+          };
+        } catch (insertError) {
+          console.error(`Error adding new winner: ${insertError.message}`);
+          
+          // This might happen if another instance already created a winner record
+          return {
+            auction_id: missed.auction_id,
+            missed_winner_id: missed.user_id,
+            error: insertError.message
+          };
+        }
       })
     );
 
