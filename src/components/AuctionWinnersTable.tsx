@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -171,7 +170,7 @@ export default function AuctionWinnersTable() {
           id: winner.winning_bid_id?.id || '',
           amount: winner.winning_bid_id?.amount || 0
         },
-        email_sent: winner.email_sent
+        email_sent: winner.email_sent || false
       })) || [];
 
       console.log("Formatted winners:", formattedWinners);

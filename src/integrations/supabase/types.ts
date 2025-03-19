@@ -28,6 +28,7 @@ export type Database = {
         Row: {
           auction_id: string | null
           created_at: string | null
+          email_sent: boolean | null
           id: string
           payment_deadline: string | null
           status: string | null
@@ -37,6 +38,7 @@ export type Database = {
         Insert: {
           auction_id?: string | null
           created_at?: string | null
+          email_sent?: boolean | null
           id?: string
           payment_deadline?: string | null
           status?: string | null
@@ -46,6 +48,7 @@ export type Database = {
         Update: {
           auction_id?: string | null
           created_at?: string | null
+          email_sent?: boolean | null
           id?: string
           payment_deadline?: string | null
           status?: string | null
