@@ -39,6 +39,7 @@ interface Winner {
     id: string;
     amount: number;
   };
+  email_sent: boolean;
 }
 
 interface Auction {
@@ -75,33 +76,49 @@ export default function AuctionWinnersTable() {
   }, [selectedAuctionId]);
 
   const fetchAuctions = async () => {
-    const { data, error } = await supabase
-      .from('auctions')
-      .select('id, title')
-      .order('title');
+    try {
+      const { data, error } = await supabase
+        .from('auctions')
+        .select('id, title')
+        .order('title');
 
-    if (error) {
+      if (error) {
+        toast({
+          title: "Error fetching auctions",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setAuctions(data || []);
+    } catch (error) {
+      console.error("Error fetching auctions:", error);
       toast({
         title: "Error fetching auctions",
-        description: error.message,
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
-      return;
     }
-
-    setAuctions(data || []);
   };
 
   const fetchWinners = async () => {
     setLoading(true);
     
     try {
+      console.log("Fetching winners with selectedAuctionId:", selectedAuctionId);
+      
       // First, fetch all user profiles into a map for quick lookup
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, email');
       
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw profilesError;
+      }
+      
+      console.log("Fetched profiles:", profilesData?.length || 0);
       
       // Create a map of user IDs to their email addresses for quick access
       const userMap = new Map();
@@ -117,6 +134,7 @@ export default function AuctionWinnersTable() {
           status, 
           payment_deadline,
           user_id,
+          email_sent,
           auction_id(id, title),
           winning_bid_id(id, amount)
         `);
@@ -128,7 +146,13 @@ export default function AuctionWinnersTable() {
       query = query.order('payment_deadline', { ascending: false });
       
       const { data: winnersData, error: winnersError } = await query;
-      if (winnersError) throw winnersError;
+      
+      console.log("Winners data raw:", winnersData);
+      
+      if (winnersError) {
+        console.error("Error fetching winners:", winnersError);
+        throw winnersError;
+      }
 
       // Transform the data to match the Winner interface
       const formattedWinners = winnersData?.map(winner => ({
@@ -146,9 +170,11 @@ export default function AuctionWinnersTable() {
         winning_bid: {
           id: winner.winning_bid_id?.id || '',
           amount: winner.winning_bid_id?.amount || 0
-        }
+        },
+        email_sent: winner.email_sent
       })) || [];
 
+      console.log("Formatted winners:", formattedWinners);
       setWinners(formattedWinners);
     } catch (error) {
       toast({
@@ -252,7 +278,14 @@ export default function AuctionWinnersTable() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={fetchWinners} variant="outline" size="sm">
+          <Button 
+            onClick={() => {
+              console.log("Manual refresh triggered");
+              fetchWinners();
+            }} 
+            variant="outline" 
+            size="sm"
+          >
             Refresh
           </Button>
         </div>
@@ -280,6 +313,7 @@ export default function AuctionWinnersTable() {
                 <TableHead>Bid Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Payment Deadline</TableHead>
+                <TableHead>Email Sent</TableHead>
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
@@ -297,6 +331,11 @@ export default function AuctionWinnersTable() {
                   <TableCell>
                     {winner.payment_deadline ? 
                       new Date(winner.payment_deadline).toLocaleString() : 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    {winner.email_sent ? 
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Sent</Badge> : 
+                      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>}
                   </TableCell>
                   <TableCell>
                     <Button 

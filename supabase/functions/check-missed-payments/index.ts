@@ -122,7 +122,7 @@ serve(async (req) => {
 
           // Send email notification to new winner
           try {
-            await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-winner-email`, {
+            const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-winner-email`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -132,6 +132,17 @@ serve(async (req) => {
                 winnerId: newWinner.id
               })
             });
+            
+            const emailResult = await response.json();
+            console.log(`Email notification result:`, emailResult);
+            
+            // Mark as email sent based on response
+            if (emailResult.success) {
+              await supabaseClient
+                .from("auction_winners")
+                .update({ email_sent: true })
+                .eq("id", newWinner.id);
+            }
           } catch (emailError) {
             console.error(`Error sending new winner email: ${emailError}`);
           }
