@@ -35,30 +35,36 @@ serve(async (req) => {
       console.log("No specific auction ID provided, processing all ended auctions");
     }
 
-    // Find auctions that have ended but haven't been processed
-    const auctionQuery = supabaseClient
+    // First, let's lock the auctions we're about to process by updating a processing flag
+    // This helps prevent race conditions from parallel executions
+    const auctionLockQuery = supabaseClient
       .from("auctions")
-      .select("id, title, max_spots")
+      .update({ winners_being_processed: true })
       .lt("ends_at", new Date().toISOString());
-    
-    // If a specific auction ID was provided, add it to the query
+
     if (specificAuctionId) {
-      auctionQuery.eq("id", specificAuctionId);
+      auctionLockQuery.eq("id", specificAuctionId);
     } else {
       // Only process auctions where winners haven't been processed yet if no specific ID
-      auctionQuery.eq("winners_processed", false);
+      auctionLockQuery.eq("winners_processed", false)
+        .eq("winners_being_processed", false); // Only lock auctions not already being processed
     }
     
-    const { data: endedAuctions, error: auctionError } = await auctionQuery;
+    const { data: lockedAuctions, error: lockError } = await auctionLockQuery
+      .select("id, title, max_spots");
 
-    if (auctionError) {
-      throw new Error(`Error fetching ended auctions: ${auctionError.message}`);
+    if (lockError) {
+      throw new Error(`Error locking auctions for processing: ${lockError.message}`);
     }
 
-    if (!endedAuctions || endedAuctions.length === 0) {
-      console.log("No ended auctions to process");
+    if (!lockedAuctions || lockedAuctions.length === 0) {
+      console.log("No auctions available to process (already being processed or no eligible auctions)");
       return new Response(
-        JSON.stringify({ message: "No ended auctions to process" }),
+        JSON.stringify({ 
+          message: specificAuctionId 
+            ? "This auction is already being processed or doesn't exist" 
+            : "No ended auctions to process" 
+        }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
@@ -66,91 +72,92 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing ${endedAuctions.length} ended auctions`);
+    console.log(`Processing ${lockedAuctions.length} locked auctions`);
 
-    // Process each ended auction
+    // Process each locked auction
     const results = await Promise.all(
-      endedAuctions.map(async (auction) => {
+      lockedAuctions.map(async (auction) => {
         console.log(`Processing auction: ${auction.id} - ${auction.title}`);
         
-        // Mark auction as completed
-        await supabaseClient
-          .from("auctions")
-          .update({ status: "completed" })
-          .eq("id", auction.id);
+        try {
+          // Mark auction as completed
+          await supabaseClient
+            .from("auctions")
+            .update({ status: "completed" })
+            .eq("id", auction.id);
 
-        // Get all active bids for this auction
-        const { data: allBids, error: bidsError } = await supabaseClient
-          .from("bids")
-          .select("id, user_id, amount")
-          .eq("auction_id", auction.id)
-          .eq("status", "active")
-          .order("amount", { ascending: false });
+          // Get all active bids for this auction
+          const { data: allBids, error: bidsError } = await supabaseClient
+            .from("bids")
+            .select("id, user_id, amount")
+            .eq("auction_id", auction.id)
+            .eq("status", "active")
+            .order("amount", { ascending: false });
 
-        if (bidsError) {
-          throw new Error(`Error fetching bids: ${bidsError.message}`);
-        }
-
-        console.log(`Found ${allBids?.length || 0} active bids for auction ${auction.id}`);
-
-        // Get existing winners for this auction to avoid duplicates
-        const { data: existingWinners, error: existingWinnersError } = await supabaseClient
-          .from("auction_winners")
-          .select("user_id")
-          .eq("auction_id", auction.id);
-          
-        if (existingWinnersError) {
-          throw new Error(`Error fetching existing winners: ${existingWinnersError.message}`);
-        }
-        
-        // Create a set of existing winner user IDs for fast lookup
-        const existingWinnerUserIds = new Set(existingWinners?.map(winner => winner.user_id) || []);
-        console.log(`Found ${existingWinnerUserIds.size} existing winners for auction ${auction.id}`);
-
-        // Group bids by user and take only the highest bid per user
-        const userHighestBids = new Map();
-        allBids?.forEach(bid => {
-          if (!userHighestBids.has(bid.user_id) || 
-              userHighestBids.get(bid.user_id).amount < bid.amount) {
-            userHighestBids.set(bid.user_id, bid);
+          if (bidsError) {
+            throw new Error(`Error fetching bids: ${bidsError.message}`);
           }
-        });
 
-        // Sort users by their highest bid amounts
-        const sortedBids = Array.from(userHighestBids.values())
-          .sort((a, b) => b.amount - a.amount);
-        
-        // Take only the top N users (where N is max_spots)
-        const maxSpots = auction.max_spots || 3;
-        const topBidders = sortedBids.slice(0, maxSpots);
+          console.log(`Found ${allBids?.length || 0} active bids for auction ${auction.id}`);
 
-        console.log(`Selected ${topBidders.length} winners out of ${maxSpots} max spots`);
+          // Get existing winners for this auction to avoid duplicates
+          const { data: existingWinners, error: existingWinnersError } = await supabaseClient
+            .from("auction_winners")
+            .select("user_id")
+            .eq("auction_id", auction.id);
+            
+          if (existingWinnersError) {
+            throw new Error(`Error fetching existing winners: ${existingWinnersError.message}`);
+          }
+          
+          // Create a set of existing winner user IDs for fast lookup
+          const existingWinnerUserIds = new Set(existingWinners?.map(winner => winner.user_id) || []);
+          console.log(`Found ${existingWinnerUserIds.size} existing winners for auction ${auction.id}`);
 
-        // Process each winner
-        const winners = await Promise.all(
-          topBidders.map(async (bid) => {
+          // Group bids by user and take only the highest bid per user
+          const userHighestBids = new Map();
+          allBids?.forEach(bid => {
+            if (!userHighestBids.has(bid.user_id) || 
+                userHighestBids.get(bid.user_id).amount < bid.amount) {
+              userHighestBids.set(bid.user_id, bid);
+            }
+          });
+
+          // Sort users by their highest bid amounts
+          const sortedBids = Array.from(userHighestBids.values())
+            .sort((a, b) => b.amount - a.amount);
+          
+          // Take only the top N users (where N is max_spots)
+          const maxSpots = auction.max_spots || 3;
+          const topBidders = sortedBids.slice(0, maxSpots);
+
+          console.log(`Selected ${topBidders.length} winners out of ${maxSpots} max spots`);
+
+          // Process each winner - but do it one by one to prevent race conditions
+          const winners = [];
+          for (const bid of topBidders) {
             console.log(`Processing winner user ${bid.user_id} with highest bid ${bid.id} amount ${bid.amount}`);
             
-            // Skip if this user is already a winner for this auction
-            if (existingWinnerUserIds.has(bid.user_id)) {
+            // Double-check if this user is already a winner for this auction
+            // This prevents race conditions between when we checked earlier and now
+            const { data: currentWinner } = await supabaseClient
+              .from("auction_winners")
+              .select("*")
+              .eq("auction_id", auction.id)
+              .eq("user_id", bid.user_id)
+              .maybeSingle();
+
+            if (currentWinner) {
               console.log(`User ${bid.user_id} is already a winner for auction ${auction.id}, skipping`);
-              
-              // Fetch the existing winner record to return
-              const { data: existingWinner } = await supabaseClient
-                .from("auction_winners")
-                .select("*")
-                .eq("auction_id", auction.id)
-                .eq("user_id", bid.user_id)
-                .maybeSingle();
-                
-              return existingWinner;
+              winners.push(currentWinner);
+              continue;
             }
 
             // Set 24 hour payment deadline
             const deadline = new Date();
             deadline.setHours(deadline.getHours() + 24);
 
-            // Insert winner record
+            // Insert winner record with ON CONFLICT DO NOTHING to prevent duplicates
             const { data: winner, error: winnerError } = await supabaseClient
               .from("auction_winners")
               .insert({
@@ -165,7 +172,7 @@ serve(async (req) => {
 
             if (winnerError) {
               console.error(`Error creating winner record: ${winnerError.message}`);
-              return null;
+              continue;
             }
 
             console.log(`Created winner record for user ${bid.user_id} in auction ${auction.id}`);
@@ -203,21 +210,32 @@ serve(async (req) => {
               console.error(`Error sending winner email: ${emailError}`);
             }
 
-            return winner;
-          })
-        );
+            winners.push(winner);
+          }
 
-        // Mark the auction as winners_processed
-        await supabaseClient
-          .from("auctions")
-          .update({ winners_processed: true })
-          .eq("id", auction.id);
+          // Mark the auction as winners_processed and remove the processing lock
+          await supabaseClient
+            .from("auctions")
+            .update({ 
+              winners_processed: true,
+              winners_being_processed: false
+            })
+            .eq("id", auction.id);
 
-        return {
-          auction_id: auction.id,
-          title: auction.title,
-          winners: winners.filter(Boolean)
-        };
+          return {
+            auction_id: auction.id,
+            title: auction.title,
+            winners: winners.filter(Boolean)
+          };
+        } catch (processError) {
+          // If there's an error, release the processing lock
+          await supabaseClient
+            .from("auctions")
+            .update({ winners_being_processed: false })
+            .eq("id", auction.id);
+          
+          throw processError;
+        }
       })
     );
 
