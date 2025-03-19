@@ -44,6 +44,9 @@ serve(async (req) => {
     // If a specific auction ID was provided, add it to the query
     if (specificAuctionId) {
       auctionQuery.eq("id", specificAuctionId);
+    } else {
+      // Only process auctions where winners haven't been processed yet if no specific ID
+      auctionQuery.eq("winners_processed", false);
     }
     
     const { data: endedAuctions, error: auctionError } = await auctionQuery;
@@ -90,6 +93,20 @@ serve(async (req) => {
 
         console.log(`Found ${allBids?.length || 0} active bids for auction ${auction.id}`);
 
+        // Get existing winners for this auction to avoid duplicates
+        const { data: existingWinners, error: existingWinnersError } = await supabaseClient
+          .from("auction_winners")
+          .select("user_id")
+          .eq("auction_id", auction.id);
+          
+        if (existingWinnersError) {
+          throw new Error(`Error fetching existing winners: ${existingWinnersError.message}`);
+        }
+        
+        // Create a set of existing winner user IDs for fast lookup
+        const existingWinnerUserIds = new Set(existingWinners?.map(winner => winner.user_id) || []);
+        console.log(`Found ${existingWinnerUserIds.size} existing winners for auction ${auction.id}`);
+
         // Group bids by user and take only the highest bid per user
         const userHighestBids = new Map();
         allBids?.forEach(bid => {
@@ -114,16 +131,18 @@ serve(async (req) => {
           topBidders.map(async (bid) => {
             console.log(`Processing winner user ${bid.user_id} with highest bid ${bid.id} amount ${bid.amount}`);
             
-            // Check if this user is already a winner for this auction
-            const { data: existingWinner } = await supabaseClient
-              .from("auction_winners")
-              .select("id")
-              .eq("auction_id", auction.id)
-              .eq("user_id", bid.user_id)
-              .maybeSingle();
-
-            if (existingWinner) {
+            // Skip if this user is already a winner for this auction
+            if (existingWinnerUserIds.has(bid.user_id)) {
               console.log(`User ${bid.user_id} is already a winner for auction ${auction.id}, skipping`);
+              
+              // Fetch the existing winner record to return
+              const { data: existingWinner } = await supabaseClient
+                .from("auction_winners")
+                .select("*")
+                .eq("auction_id", auction.id)
+                .eq("user_id", bid.user_id)
+                .maybeSingle();
+                
               return existingWinner;
             }
 
