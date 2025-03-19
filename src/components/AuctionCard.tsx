@@ -116,6 +116,19 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
         // Call the callback to update the parent component's state
         onBidPlaced?.(bid as Bid);
 
+        // Call the notification function with the correct bid amount
+        try {
+          const { error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
+            body: { bidId: bid.id, amount: bidAmount }
+          });
+          
+          if (notificationError) {
+            console.error("Error sending bid notifications:", notificationError);
+          }
+        } catch (notificationError) {
+          console.error("Failed to invoke bid notification function:", notificationError);
+        }
+
         // Show toast notification
         toast({
           title: `Bid of $${bid.amount} placed successfully!`,

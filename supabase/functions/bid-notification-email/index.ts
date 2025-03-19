@@ -535,7 +535,7 @@ Deno.serve(async (req) => {
         to: userEmail,
         subject: `New bid placed on auction: ${auction.title}`,
         text: `A new bid has been placed on the auction: ${auction.title}.
-          New bid amount: $${bidId ? requestData.amount : auction.current_price}.
+          New bid amount: $${newBidAmount}.
           Auction description: ${auction.description}.
           Starting price: $${auction.starting_price}.
           Current highest bid: $${auction.current_price}.
@@ -546,7 +546,7 @@ Deno.serve(async (req) => {
             data: `
               <h1>New Bid Alert!</h1>
               <p>A new bid has been placed on the auction: <strong>${auction.title}</strong></p>
-              <p>New bid amount: <strong>$${bidId ? requestData.amount : auction.current_price}</strong></p>
+              <p>New bid amount: <strong>$${newBidAmount}</strong></p>
               <p>Auction details:</p>
               <ul>
                 <li>Description: ${auction.description}</li>
@@ -570,7 +570,7 @@ Deno.serve(async (req) => {
             .insert({
               user_id: bidderId,
               type: 'new_bid',
-              message: `New bid of $${bidId ? requestData.amount : auction.current_price} placed on auction: ${auction.title}`,
+              message: `New bid of $${newBidAmount} placed on auction: ${auction.title}`,
               auction_id: auction.id
             })
             .then(({ error: notificationError }) => {
