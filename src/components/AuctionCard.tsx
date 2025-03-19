@@ -1,3 +1,4 @@
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -116,10 +117,10 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
         // Call the callback to update the parent component's state
         onBidPlaced?.(bid as Bid);
 
-        // Call the notification function with the correct bid amount
+        // Call the notification function with the bid ID, not the bid amount
         try {
           const { error: notificationError } = await supabase.functions.invoke('bid-notification-email', {
-            body: { bidId: bid.id, amount: bidAmount }
+            body: { bidId: bid.id }
           });
           
           if (notificationError) {

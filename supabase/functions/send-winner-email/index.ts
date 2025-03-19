@@ -41,102 +41,161 @@ Deno.serve(async (req) => {
   try {
     // Parse the request body
     const requestData = await req.json()
-    const { auctionId } = requestData
+    const { winnerId, auctionId } = requestData
     
-    console.log(`Processing auction ID: ${auctionId}`)
+    console.log(`Processing request with winnerId: ${winnerId}, auctionId: ${auctionId}`)
     
-    if (!auctionId) {
-      console.error('Missing required parameter: auctionId')
+    if (!winnerId && !auctionId) {
+      console.error('Missing required parameters: either winnerId or auctionId must be provided')
       return new Response(
-        JSON.stringify({ error: 'Missing required parameter: auctionId' }),
+        JSON.stringify({ error: 'Missing required parameters: either winnerId or auctionId must be provided' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Get auction details
-    console.log(`Fetching auction details for ID: ${auctionId}`)
-    const { data: auction, error: auctionError } = await supabase
-      .from('auctions')
-      .select('*')
-      .eq('id', auctionId)
-      .single()
+    let auction;
+    let winners = [];
 
-    if (auctionError) {
-      console.error(`Error fetching auction: ${auctionError.message}`)
-      return new Response(
-        JSON.stringify({ error: `Error fetching auction: ${auctionError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // If winnerId is provided, get specific winner details and corresponding auction
+    if (winnerId) {
+      console.log(`Fetching winner details for ID: ${winnerId}`)
+      const { data: winner, error: winnerError } = await supabase
+        .from('auction_winners')
+        .select('*, auctions(*)')
+        .eq('id', winnerId)
+        .single()
+
+      if (winnerError) {
+        console.error(`Error fetching winner: ${winnerError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching winner: ${winnerError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log(`Winner data retrieved:`, winner)
+      auction = winner.auctions
+      winners = [winner]
+    } 
+    // If auctionId is provided, get auction details and all its winners
+    else if (auctionId) {
+      console.log(`Fetching auction details for ID: ${auctionId}`)
+      const { data: auctionData, error: auctionError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('id', auctionId)
+        .single()
+
+      if (auctionError) {
+        console.error(`Error fetching auction: ${auctionError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching auction: ${auctionError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log(`Auction data retrieved:`, auctionData)
+      auction = auctionData;
+      
+      // Get all winners for this auction
+      console.log(`Fetching winners for auction ID: ${auctionId}`)
+      const { data: auctionWinners, error: winnersError } = await supabase
+        .from('auction_winners')
+        .select('*')
+        .eq('auction_id', auctionId)
+        .eq('status', 'pending_payment')
+      
+      if (winnersError) {
+        console.error(`Error fetching auction winners: ${winnersError.message}`)
+        return new Response(
+          JSON.stringify({ error: `Error fetching auction winners: ${winnersError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      console.log(`Found ${auctionWinners.length} winners for auction ${auctionId}`)
+      winners = auctionWinners
     }
 
-    console.log(`Auction data retrieved:`, auction)
-    
-    // Create auction page URL
-    const auctionPageUrl = `${baseUrl}/auctions/${auction.id}`;
-    
-    // Find winners (top bidders based on max_spots)
-    console.log(`Fetching top bidders for auction with max_spots: ${auction.max_spots}`)
-    const { data: topBids, error: bidsError } = await supabase
-      .from('bids')
-      .select('id, user_id, amount')
-      .eq('auction_id', auctionId)
-      .eq('status', 'active')
-      .order('amount', { ascending: false })
-      .limit(auction.max_spots || 3)
-
-    if (bidsError) {
-      console.error(`Error fetching top bids: ${bidsError.message}`)
+    if (!winners || winners.length === 0) {
+      console.log('No winners found to notify')
       return new Response(
-        JSON.stringify({ error: `Error fetching top bids: ${bidsError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log(`Found ${topBids?.length || 0} top bidders`)
-    console.log(`Top bids data:`, topBids)
-
-    if (!topBids || topBids.length === 0) {
-      console.log('No eligible winners found')
-      return new Response(
-        JSON.stringify({ message: 'No eligible winners found', successCount: 0 }),
+        JSON.stringify({ message: 'No winners found to notify', successCount: 0 }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    // Create auction page URL
+    const auctionPageUrl = `${baseUrl}/auctions/${auction.id}`;
+    
     // Process each winner
     let successCount = 0
     const emailPromises = []
     
-    for (const bid of topBids) {
+    for (const winner of winners) {
+      // Check if email notification flag is already set
+      const { data: emailSentCheck, error: emailCheckError } = await supabase
+        .from('auction_winners')
+        .select('email_sent')
+        .eq('id', winner.id)
+        .single();
+      
+      if (emailCheckError) {
+        console.error(`Error checking email sent status: ${emailCheckError.message}`);
+        continue;
+      }
+      
+      if (emailSentCheck && emailSentCheck.email_sent) {
+        console.log(`Email already sent for winner ${winner.id}, skipping`);
+        successCount++; // Count as success since the email was previously sent
+        continue;
+      }
+      
       // Get user details for email
-      console.log(`Fetching user details for user ID: ${bid.user_id}`)
-      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(bid.user_id)
+      console.log(`Fetching user details for user ID: ${winner.user_id}`)
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(winner.user_id)
 
       if (userError) {
-        console.error(`Error fetching user with ID ${bid.user_id}: ${userError.message}`)
+        console.error(`Error fetching user with ID ${winner.user_id}: ${userError.message}`)
         continue
       }
 
       if (!userData || !userData.user || !userData.user.email) {
-        console.error(`No email found for user with ID ${bid.user_id}`)
+        console.error(`No email found for user with ID ${winner.user_id}`)
         continue
       }
 
       const userEmail = userData.user.email
       console.log(`Processing email to: ${userEmail}`)
 
+      // Fetch the bid amount for this winner
+      console.log(`Fetching bid details for ID: ${winner.winning_bid_id}`)
+      const { data: bidData, error: bidError } = await supabase
+        .from('bids')
+        .select('amount')
+        .eq('id', winner.winning_bid_id)
+        .single()
+        
+      if (bidError) {
+        console.error(`Error fetching bid: ${bidError.message}`)
+        continue
+      }
+      
+      const bidAmount = bidData ? bidData.amount : 'unknown'
+      console.log(`Bid amount: $${bidAmount}`)
+
       // Prepare email content
       const emailPromise = smtpClient.sendAsync({
         from: 'EM Auction System <sabina@elegantmentions.com>',
         to: userEmail,
         subject: `Congratulations! You've won the auction: ${auction.title}`,
-        text: `Congratulations! You are one of the winning bidders for the auction: ${auction.title}. Your winning bid amount: $${bid.amount}. Please log in to your account to complete the payment process within 24 hours. You can view the auction and complete payment here: ${auctionPageUrl} Thank you for participating!`,
+        text: `Congratulations! You are one of the winning bidders for the auction: ${auction.title}. Your winning bid amount: $${bidAmount}. Please log in to your account to complete the payment process within 24 hours. You can view the auction and complete payment here: ${auctionPageUrl} Thank you for participating!`,
         attachment: [
           {
             data: `
               <h1>Congratulations!</h1>
               <p>You are one of the winning bidders for the auction: <strong>${auction.title}</strong></p>
-              <p>Your winning bid amount: <strong>$${bid.amount}</strong></p>
+              <p>Your winning bid amount: <strong>$${bidAmount}</strong></p>
               <p>Please log in to your account to complete the payment process within 24 hours.</p>
               <p><a href="${auctionPageUrl}" style="background-color: #1a73e8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">Complete Payment</a></p>
               <p>Thank you for participating!</p>
@@ -145,23 +204,29 @@ Deno.serve(async (req) => {
           }
         ]
       })
-        .then(result => {
+        .then(async result => {
           console.log(`Email sent successfully to ${userEmail}, result:`, result)
+          
+          // Mark this winner as having received an email
+          await supabase
+            .from('auction_winners')
+            .update({ email_sent: true })
+            .eq('id', winner.id);
           
           // Create notification in database
           return supabase
             .from('notifications')
             .insert({
-              user_id: bid.user_id,
+              user_id: winner.user_id,
               type: 'winner',
-              message: `You've won the auction: ${auction.title} with a bid of $${bid.amount}`,
-              auction_id: auctionId
+              message: `You've won the auction: ${auction.title} with a bid of $${bidAmount}`,
+              auction_id: auction.id
             })
             .then(({ error: notificationError }) => {
               if (notificationError) {
                 console.error(`Error creating notification: ${notificationError.message}`)
               } else {
-                console.log(`Notification created for user ${bid.user_id}`)
+                console.log(`Notification created for user ${winner.user_id}`)
               }
               return { success: true, email: userEmail }
             })
@@ -180,21 +245,8 @@ Deno.serve(async (req) => {
     console.log(`Email sending results:`, results)
 
     // Count successful emails
-    successCount = results.filter(r => r.success).length
+    successCount += results.filter(r => r.success).length
     console.log(`Successfully sent ${successCount} emails`)
-
-    // Mark auction as processed
-    console.log(`Updating auction ${auctionId} as processed`)
-    const { error: updateError } = await supabase
-      .from('auctions')
-      .update({ winners_processed: true })
-      .eq('id', auctionId)
-
-    if (updateError) {
-      console.error(`Error updating auction status: ${updateError.message}`)
-    } else {
-      console.log('Auction status updated successfully')
-    }
 
     // Return success response
     return new Response(

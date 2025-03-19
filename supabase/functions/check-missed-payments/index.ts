@@ -110,7 +110,8 @@ serve(async (req) => {
               user_id: nextBidder.user_id,
               winning_bid_id: nextBidder.id,
               payment_deadline: deadline.toISOString(),
-              status: "pending_payment"
+              status: "pending_payment",
+              email_sent: false // Initialize email_sent flag
             })
             .select()
             .single();

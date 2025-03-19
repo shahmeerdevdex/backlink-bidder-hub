@@ -173,7 +173,8 @@ serve(async (req) => {
                 user_id: bid.user_id,
                 winning_bid_id: bid.id,
                 payment_deadline: deadline.toISOString(),
-                status: "pending_payment"
+                status: "pending_payment",
+                email_sent: false // Initialize email_sent flag
               })
               .select()
               .single();
@@ -204,7 +205,7 @@ serve(async (req) => {
                   "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
                 },
                 body: JSON.stringify({
-                  auctionId: auction.id
+                  winnerId: winner.id
                 })
               });
               
