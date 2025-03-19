@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
 
       // Prepare email content
       const emailPromise = smtpClient.sendAsync({
-        from: 'sabina@elegantmentions.com',
+        from: 'EM Auction System <sabina@elegantmentions.com>',
         to: userEmail,
         subject: `Congratulations! You've won the auction: ${auction.title}`,
         text: `Congratulations! You are one of the winning bidders for the auction: ${auction.title}. Your winning bid amount: $${bid.amount}. Please log in to your account to complete the payment process within 24 hours. You can view the auction and complete payment here: ${auctionPageUrl} Thank you for participating!`,
