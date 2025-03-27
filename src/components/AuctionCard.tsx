@@ -1,4 +1,3 @@
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -168,58 +167,17 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
       ))
     : null;
 
-  // For unauthenticated users, show more information but limit bidding functionality
-  if (!user) {
-    return (
-      <Card className={cn("bg-secondary", className)}>
-        <CardHeader>
-          <CardTitle>{auction.title}</CardTitle>
-          <CardDescription>
-            Ends in {timeRemaining}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <div className="text-sm text-muted-foreground">
-                {formattedDescription}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Starting Price</Label>
-                <p className="text-lg">${auction.starting_price}</p>
-              </div>
-              <div>
-                <Label>Current Highest Bid</Label>
-                <p className="text-lg font-bold">${highestBid}</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button variant="outline" onClick={handleNavigateToAuth}>
-            <LogIn className="mr-2 h-4 w-4" />
-            Sign In to Bid
-          </Button>
-          <Button onClick={handleViewAuction} className="ml-2">View Auction</Button>
-        </CardFooter>
-      </Card>
-    );
-  }
-
-  // For authenticated users, show full card with bidding functionality
+  // Common card structure for both authenticated and unauthenticated users
   return (
-    <Card className={cn("bg-secondary", className)}>
+    <Card className={cn("bg-secondary h-full flex flex-col", className)}>
       <CardHeader>
         <CardTitle>{auction.title}</CardTitle>
         <CardDescription>
           Ends in {timeRemaining}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="grid gap-4">
+      <CardContent className="flex-grow">
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label>Description</Label>
             <div className="text-sm text-muted-foreground">
@@ -233,56 +191,72 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
             </div>
             <div>
               <Label>Current Highest Bid</Label>
-              <p className="text-xl font-bold">${highestBid}</p>
+              <p className="text-lg font-bold">${highestBid}</p>
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="bid">Your Bid</Label>
-            <Input
-              id="bid"
-              placeholder="Enter your bid amount"
-              type="number"
-              onChange={(e) => setBidAmount(Number(e.target.value))}
-            />
-          </div>
+          
+          {/* Conditional rendering based on authentication status */}
+          {user ? (
+            <div className="space-y-2">
+              <Label htmlFor="bid">Your Bid</Label>
+              <Input
+                id="bid"
+                placeholder="Enter your bid amount"
+                type="number"
+                onChange={(e) => setBidAmount(Number(e.target.value))}
+              />
+            </div>
+          ) : null}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" disabled={isBidding}>
-              {isBidding ? (
-                <>
-                  Placing Bid <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                </>
-              ) : (
-                "Place Bid"
-              )}
+      <CardFooter className="mt-auto justify-between">
+        {user ? (
+          <>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" disabled={isBidding}>
+                  {isBidding ? (
+                    <>
+                      Placing Bid <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    </>
+                  ) : (
+                    "Place Bid"
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to bid <strong>${bidAmount}</strong> on{" "}
+                    {auction.title}? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={placeBid} disabled={isBidding}>
+                    {isBidding ? (
+                      <>
+                        Confirming <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                      </>
+                    ) : (
+                      "Confirm"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button onClick={handleViewAuction}>View Auction</Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" onClick={handleNavigateToAuth}>
+              <LogIn className="mr-2 h-4 w-4" />
+              Sign In to Bid
             </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to bid <strong>${bidAmount}</strong> on{" "}
-                {auction.title}? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={placeBid} disabled={isBidding}>
-                {isBidding ? (
-                  <>
-                    Confirming <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                  </>
-                ) : (
-                  "Confirm"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <Button onClick={handleViewAuction}>View Auction</Button>
+            <Button onClick={handleViewAuction}>View Auction</Button>
+          </>
+        )}
       </CardFooter>
     </Card>
   );
