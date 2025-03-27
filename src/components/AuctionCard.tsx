@@ -1,3 +1,4 @@
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -171,7 +172,9 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
   return (
     <Card className={cn("bg-secondary h-full flex flex-col", className)}>
       <CardHeader>
-        <CardTitle>{auction.title}</CardTitle>
+        {user && (
+          <CardTitle>{auction.title}</CardTitle>
+        )}
         <CardDescription>
           Ends in {timeRemaining}
         </CardDescription>
