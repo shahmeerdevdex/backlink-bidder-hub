@@ -15,10 +15,12 @@ import { Auction, Bid } from '@/types';
 export default function Index() {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [sortBy, setSortBy] = useState<string>('ends_at');
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchAuctions = async () => {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('auctions')
         .select('*')
@@ -26,6 +28,7 @@ export default function Index() {
 
       if (error) {
         console.error('Error fetching auctions:', error);
+        setIsLoading(false);
         return;
       }
 
@@ -36,6 +39,7 @@ export default function Index() {
       ) || [];
 
       setAuctions(activeAuctions);
+      setIsLoading(false);
     };
 
     fetchAuctions();
@@ -79,20 +83,26 @@ export default function Index() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {auctions.map((auction) => (
-          <AuctionCard
-            key={auction.id}
-            auction={auction}
-            onBidPlaced={handleBidPlaced}
-          />
-        ))}
-        {auctions.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            No active auctions at the moment.
-          </div>
-        )}
-      </div>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {auctions.map((auction) => (
+            <AuctionCard
+              key={auction.id}
+              auction={auction}
+              onBidPlaced={handleBidPlaced}
+            />
+          ))}
+          {auctions.length === 0 && (
+            <div className="col-span-full text-center py-12 text-muted-foreground">
+              No active auctions at the moment.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

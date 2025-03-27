@@ -159,23 +159,51 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
     navigate('/auth');
   };
 
-  // For unauthenticated users, show limited information
+  // Format description by preserving newlines and paragraphs
+  const formattedDescription = auction.description
+    ? auction.description.split('\n').map((paragraph, index) => (
+        <p key={index} className="mb-2">
+          {paragraph}
+        </p>
+      ))
+    : null;
+
+  // For unauthenticated users, show more information but limit bidding functionality
   if (!user) {
     return (
       <Card className={cn("bg-secondary", className)}>
         <CardHeader>
+          <CardTitle>{auction.title}</CardTitle>
           <CardDescription>
             Ends in {timeRemaining}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Sign in to see more details and place bids.</p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <div className="text-sm text-muted-foreground">
+                {formattedDescription}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Starting Price</Label>
+                <p className="text-lg">${auction.starting_price}</p>
+              </div>
+              <div>
+                <Label>Current Highest Bid</Label>
+                <p className="text-lg font-bold">${highestBid}</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
         <CardFooter>
           <Button variant="outline" onClick={handleNavigateToAuth}>
             <LogIn className="mr-2 h-4 w-4" />
-            Sign In to View
+            Sign In to Bid
           </Button>
+          <Button onClick={handleViewAuction} className="ml-2">View Auction</Button>
         </CardFooter>
       </Card>
     );
@@ -187,14 +215,26 @@ export function AuctionCard({ auction, className, onBidPlaced }: AuctionCardProp
       <CardHeader>
         <CardTitle>{auction.title}</CardTitle>
         <CardDescription>
-          {auction.description} - Ends in {timeRemaining}
+          Ends in {timeRemaining}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-4">
           <div className="space-y-2">
-            <Label htmlFor="bid">Current Highest Bid</Label>
-            <p className="text-xl font-bold">${highestBid}</p>
+            <Label>Description</Label>
+            <div className="text-sm text-muted-foreground">
+              {formattedDescription}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Starting Price</Label>
+              <p className="text-lg">${auction.starting_price}</p>
+            </div>
+            <div>
+              <Label>Current Highest Bid</Label>
+              <p className="text-xl font-bold">${highestBid}</p>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="bid">Your Bid</Label>
