@@ -137,16 +137,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.reload();
       }
     } else if (event === 'SIGNED_IN') {
-      if (user && !user.email_confirmed_at) {
+      if (user && !user.email_confirmed_at && user.app_metadata.provider === 'email') {
         toast({
           title: "Email Not Verified",
           description: "Please check your email to verify your account.",
           variant: "destructive",
         });
       } else if (user) {
+        const provider = user.app_metadata.provider;
+        let providerName = provider === 'google' ? 'Google' : 
+                          provider === 'github' ? 'GitHub' : 'email';
+        
         toast({
           title: "Welcome Back",
-          description: `Signed in as ${user.email}`,
+          description: `Signed in ${provider !== 'email' ? `with ${providerName}` : `as ${user.email}`}`,
         });
       }
     } else if (event === 'SIGNED_OUT') {
